@@ -13,12 +13,18 @@ targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
 codec = { package = "parity-scale-codec", version = "3.0.0", features = ["derive"], default-features = false }
+ethereum = { version = "0.14.0", default-features = false, features = [ "with-codec" ] }
+ethereum-types = { version = "0.14", default-features = false }
 scale-info = { version = "2.2.0", default-features = false, features = ["derive"] }
 
 # Substrate
 frame-benchmarking = { git = "https://github.com/paritytech/substrate", default-features = false, optional = true, "branch" = "polkadot-v0.9.37" }
 frame-support = { git = "https://github.com/paritytech/substrate", default-features = false, "branch" = "polkadot-v0.9.37" }
 frame-system = { git = "https://github.com/paritytech/substrate", default-features = false, "branch" = "polkadot-v0.9.37" }
+sp-std = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.37" }
+
+# Polkadot
+xcm = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.37" }
 
 [dev-dependencies]
 serde = { version = "1.0.132" }
@@ -27,6 +33,9 @@ serde = { version = "1.0.132" }
 sp-core = { git = "https://github.com/paritytech/substrate", default-features = false, "branch" = "polkadot-v0.9.37" }
 sp-io = { git = "https://github.com/paritytech/substrate", default-features = false, "branch" = "polkadot-v0.9.37" }
 sp-runtime = { git = "https://github.com/paritytech/substrate", default-features = false, "branch" = "polkadot-v0.9.37" }
+
+# Polkadot
+#pallet-xcm = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.32" }
 
 [features]
 default = ["std"]
@@ -37,5 +46,6 @@ std = [
 	"frame-benchmarking/std",
 	"frame-support/std",
 	"frame-system/std",
+	"sp-std/std",
 ]
 try-runtime = [ "frame-support/try-runtime" ]

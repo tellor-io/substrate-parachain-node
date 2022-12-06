@@ -14,16 +14,24 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+mod ethereum_xcm;
+pub mod traits;
+mod xcm;
+
 #[frame_support::pallet]
 pub mod pallet {
+	use super::traits::Xcm;
 	use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*};
 	use frame_system::pallet_prelude::*;
+	use sp_std::vec;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+
+		type Xcm: Xcm<Self>;
 	}
 
 	#[pallet::pallet]
@@ -65,6 +73,17 @@ pub mod pallet {
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		#[pallet::weight(Weight::from_ref_time(10_000) + T::DbWeight::get().writes(1))]
+		pub fn begin_dispute(origin: OriginFor<T>) -> DispatchResultWithPostInfo {
+			let _who = ensure_signed(origin.clone())?;
+
+			let destination = crate::xcm::destination::<T>();
+			let message = crate::xcm::build_message::<T>();
+			T::Xcm::send(origin, destination, message)?;
+
+			Ok(().into())
+		}
+
 		/// An example dispatchable that takes a singles value as a parameter, writes the value to
 		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
 		#[pallet::call_index(0)]

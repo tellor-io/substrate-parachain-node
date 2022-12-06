@@ -1,11 +1,13 @@
 use crate as tellor;
-use frame_support::{parameter_types, traits::Everything};
+use frame_support::{dispatch::DispatchResult, parameter_types, traits::Everything};
 use frame_system as system;
+use frame_system::pallet_prelude::OriginFor;
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
 };
+use xcm::{opaque::VersionedXcm, VersionedMultiLocation};
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -56,6 +58,17 @@ impl system::Config for Test {
 
 impl tellor::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
+	type Xcm = Test;
+}
+
+impl crate::traits::Xcm<Test> for Test {
+	fn send(
+		_origin: OriginFor<Test>,
+		_dest: Box<VersionedMultiLocation>,
+		_message: Box<VersionedXcm>,
+	) -> DispatchResult {
+		todo!()
+	}
 }
 
 // Build genesis storage according to the mock runtime.

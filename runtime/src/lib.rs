@@ -27,7 +27,7 @@ use sp_version::RuntimeVersion;
 
 use frame_support::{
 	construct_runtime,
-	dispatch::DispatchClass,
+	dispatch::{DispatchClass, DispatchResult},
 	parameter_types,
 	traits::{ConstU32, ConstU64, ConstU8, Everything},
 	weights::{
@@ -38,6 +38,7 @@ use frame_support::{
 };
 use frame_system::{
 	limits::{BlockLength, BlockWeights},
+	pallet_prelude::OriginFor,
 	EnsureRoot,
 };
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -53,7 +54,7 @@ use polkadot_runtime_common::{BlockHashCount, SlowAdjustingFeeUpdate};
 use weights::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight};
 
 // XCM Imports
-use xcm::latest::prelude::BodyId;
+use xcm::{latest::prelude::BodyId, opaque::VersionedXcm, VersionedMultiLocation};
 use xcm_executor::XcmExecutor;
 
 /// Import the tellor pallet.
@@ -451,6 +452,17 @@ impl pallet_collator_selection::Config for Runtime {
 /// Configure the tellor pallet in pallets/tellor.
 impl tellor::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
+	type Xcm = Runtime;
+}
+
+impl tellor::traits::Xcm<Runtime> for Runtime {
+	fn send(
+		origin: OriginFor<Runtime>,
+		dest: Box<VersionedMultiLocation>,
+		message: Box<VersionedXcm>,
+	) -> DispatchResult {
+		PolkadotXcm::send(origin, dest, message)
+	}
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

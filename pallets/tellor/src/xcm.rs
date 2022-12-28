@@ -1,9 +1,9 @@
 use crate::{
-	ethereum_xcm::{EthereumXcmCall, EthereumXcmTransaction, EthereumXcmTransactionV2},
+	ethereum_xcm::{self, MAX_ETHEREUM_XCM_INPUT_SIZE},
 	Config,
 };
 use codec::Encode;
-use ethereum::TransactionAction;
+use sp_core::{bounded::BoundedVec, ConstU32, H160};
 use sp_std::{boxed::Box, vec};
 use xcm::{opaque::VersionedXcm, prelude::*};
 
@@ -12,38 +12,26 @@ pub(super) fn destination<T: Config>() -> Box<VersionedMultiLocation> {
 	Box::new(VersionedMultiLocation::V1(dest))
 }
 
-pub(super) fn build_message<T: Config>() -> Box<VersionedXcm> {
-	let buy_execution_asset = X2(PalletInstance(50), GeneralIndex(1));
-	let buy_asset_location = MultiLocation { parents: 0, interior: buy_execution_asset };
+pub(super) fn build_message<T: Config>(
+	contract_address: H160,
+	evm_call: BoundedVec<u8, ConstU32<MAX_ETHEREUM_XCM_INPUT_SIZE>>,
+) -> Box<VersionedXcm> {
+	// Balances pallet on destination chain
+	let self_reserve = MultiLocation { parents: 0, interior: X1(PalletInstance(3)) };
+	let fees = MultiAsset { id: Concrete(self_reserve), fun: Fungible(1_000_000_000_000_000_u128) };
 
-	let fees = MultiAsset { id: Concrete(buy_asset_location), fun: Fungible(1000000000000_u128) };
-	let buy_execution_asset = X2(PalletInstance(50), GeneralIndex(1));
-	let reserved_asset = X3(Parachain(1000), PalletInstance(50), GeneralIndex(1));
+	let call = ethereum_xcm::transact(contract_address, evm_call, 71_000.into(), None);
 
-	let reserved_location = MultiLocation { parents: 1, interior: reserved_asset };
-
-	let mut multi_assets = MultiAssets::new();
-	multi_assets
-		.push(MultiAsset { id: Concrete(reserved_location), fun: Fungible(1000000000000_u128) });
-
-	let call = EthereumXcmCall::Transact {
-		xcm_transaction: EthereumXcmTransaction::V2(EthereumXcmTransactionV2 {
-			gas_limit: Default::default(),
-			action: TransactionAction::Create,
-			value: Default::default(),
-			input: Default::default(),
-			access_list: None,
-		}),
-	}
-	.encode();
+	let withdrawal_assets =
+		MultiAssets::from_sorted_and_deduplicated_skip_checks(vec![fees.clone()]);
 
 	// Construct xcm message
 	Box::new(VersionedXcm::from(Xcm(vec![
-		WithdrawAsset(multi_assets),
+		WithdrawAsset(withdrawal_assets),
 		BuyExecution { fees, weight_limit: Unlimited },
 		Transact {
 			origin_type: OriginKind::SovereignAccount,
-			require_weight_at_most: 500000000000 as u64,
+			require_weight_at_most: 5_000_000_000u64,
 			call: call.into(),
 		},
 	])))
@@ -73,20 +61,14 @@ pub enum XcmCall {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use ethereum_types::H160;
-	use sp_core::bytes::from_hex;
+	use sp_core::{bytes::from_hex, H160};
 
 	#[test]
 	fn encodes_send() {
 		let contract_address: H160 =
 			H160::from_slice(&from_hex("0xa72f549a1a12b9b49f30a7f3aeb1f4e96389c5d8").unwrap());
 		let evm_call_data = from_hex("0xd09de08a").unwrap().try_into().unwrap();
-		let call = crate::ethereum_xcm::tests::transact(
-			contract_address,
-			evm_call_data,
-			71_000.into(),
-			None,
-		);
+		let call = ethereum_xcm::transact(contract_address, evm_call_data, 71_000.into(), None);
 
 		let destination =
 			VersionedMultiLocation::V1(MultiLocation { parents: 0, interior: X1(Parachain(1000)) });

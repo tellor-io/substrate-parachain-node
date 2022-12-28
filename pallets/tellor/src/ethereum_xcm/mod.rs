@@ -1,15 +1,17 @@
 use ethereum::TransactionAction;
-use ethereum_types::{H160, H256, U256};
 use frame_support::{dispatch::Encode, traits::ConstU32, BoundedVec};
 use scale_info::TypeInfo;
+use sp_core::{H160, H256, U256};
 use sp_std::vec::Vec;
+
+pub mod contracts;
 
 // The fixed index of `pallet-ethereum-xcm` within various runtimes.
 #[derive(Clone, Eq, PartialEq, Encode)]
 #[allow(dead_code)]
 pub enum EthereumXcm {
 	#[codec(index = 38u8)]
-	Moonbeam(EthereumXcmCall),
+	Moonbase(EthereumXcmCall),
 }
 
 // The fixed index of calls available within `pallet-ethereum-xcm`.
@@ -65,10 +67,27 @@ pub struct EthereumXcmTransactionV2 {
 	pub access_list: Option<Vec<(H160, Vec<H256>)>>,
 }
 
+pub(crate) fn transact(
+	contract_address: H160,
+	call_data: BoundedVec<u8, ConstU32<MAX_ETHEREUM_XCM_INPUT_SIZE>>,
+	gas_limit: U256,
+	value: Option<U256>,
+) -> Vec<u8> {
+	EthereumXcm::Moonbase(EthereumXcmCall::Transact {
+		xcm_transaction: EthereumXcmTransaction::V2(EthereumXcmTransactionV2 {
+			gas_limit,
+			action: TransactionAction::Call(contract_address),
+			value: value.unwrap_or(U256::zero()),
+			input: call_data,
+			access_list: None,
+		}),
+	})
+	.encode()
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
 	use super::*;
-	use ethereum_types::H160;
 	use sp_core::bytes::from_hex;
 
 	#[test]
@@ -79,23 +98,5 @@ pub(crate) mod tests {
 		let call = transact(contract_address, evm_call_data, 71_000.into(), None);
 		assert_eq!(from_hex("0x260001581501000000000000000000000000000000000000000000000000000000000000a72f549a1a12b9b49f30a7f3aeb1f4e96389c5d8000000000000000000000000000000000000000000000000000000000000000010d09de08a00").unwrap(),
 				   call);
-	}
-
-	pub(crate) fn transact(
-		contract_address: H160,
-		call_data: BoundedVec<u8, ConstU32<MAX_ETHEREUM_XCM_INPUT_SIZE>>,
-		gas_limit: U256,
-		value: Option<U256>,
-	) -> Vec<u8> {
-		EthereumXcm::Moonbeam(EthereumXcmCall::Transact {
-			xcm_transaction: EthereumXcmTransaction::V2(EthereumXcmTransactionV2 {
-				gas_limit,
-				action: TransactionAction::Call(contract_address),
-				value: value.unwrap_or(U256::zero()),
-				input: call_data,
-				access_list: None,
-			}),
-		})
-		.encode()
 	}
 }

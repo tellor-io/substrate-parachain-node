@@ -1,5 +1,5 @@
 use crate as tellor;
-use frame_support::{dispatch::DispatchResult, parameter_types, traits::Everything};
+use frame_support::{dispatch::DispatchResult, parameter_types, traits::Everything, PalletId};
 use frame_system as system;
 use frame_system::pallet_prelude::OriginFor;
 use sp_core::H256;
@@ -56,8 +56,17 @@ impl system::Config for Test {
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
+parameter_types! {
+	pub const ParaId: u32 = 3000;
+	pub const TellorPalletId: PalletId = PalletId(*b"py/tellr");
+	pub const TellorStakingContractAddress : [u8;20] = [192,30,231,241,14,164,175,70,115,207,255,98,113,14,29,119,146,171,168,243];
+}
+
 impl tellor::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
+	type PalletId = TellorPalletId;
+	type ContractAddress = TellorStakingContractAddress;
+	type ParaId = ParaId;
 	type Xcm = Test;
 }
 

@@ -1,30 +1,52 @@
 use super::{
 	AccountId, Balances, ParachainInfo, ParachainSystem, PolkadotXcm, Runtime, RuntimeCall,
-	RuntimeEvent, RuntimeOrigin, WeightToFee, XcmpQueue,
+	RuntimeEvent, RuntimeOrigin, TellorPalletId, WeightToFee, XcmpQueue,
 };
 use core::marker::PhantomData;
 use frame_support::{
-	log, match_types, parameter_types,
-	traits::{Everything, Nothing},
+	ensure, log, match_types, parameter_types,
+	traits::{Contains, Everything, Nothing},
 };
 use pallet_xcm::XcmPassthrough;
 use polkadot_parachain::primitives::Sibling;
 use polkadot_runtime_common::impls::ToAuthor;
-use xcm::latest::{prelude::*, Weight as XCMWeight};
+use sp_core::Get;
+use sp_runtime::traits::AccountIdConversion;
+use xcm::latest::{
+	prelude::{BuyExecution, DescendOrigin, WithdrawAsset, *},
+	MultiLocation, Weight as XCMWeight,
+	WeightLimit::{Limited, Unlimited},
+	Xcm,
+};
 use xcm_builder::{
-	AccountId32Aliases, AllowTopLevelPaidExecutionFrom, AllowUnpaidExecutionFrom, CurrencyAdapter,
-	EnsureXcmOrigin, FixedWeightBounds, IsConcrete, LocationInverter, NativeAsset, ParentIsPreset,
+	AccountId32Aliases, AllowKnownQueryResponses, AllowSubscriptionsFrom,
+	AllowTopLevelPaidExecutionFrom, AllowUnpaidExecutionFrom, CurrencyAdapter, EnsureXcmOrigin,
+	FixedWeightBounds, IsConcrete, LocationInverter, NativeAsset, ParentIsPreset,
 	RelayChainAsNative, SiblingParachainAsNative, SiblingParachainConvertsVia,
 	SignedAccountId32AsNative, SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit,
 	UsingComponents,
 };
-use xcm_executor::{traits::ShouldExecute, XcmExecutor};
+use xcm_executor::{
+	traits::{Convert, ShouldExecute},
+	XcmExecutor,
+};
+
+const MOONBASE: u32 = 2000;
 
 parameter_types! {
 	pub const RelayLocation: MultiLocation = MultiLocation::parent();
 	pub const RelayNetwork: NetworkId = NetworkId::Any;
+	pub SelfReserve: MultiLocation = MultiLocation { parents:0, interior: Here };
 	pub RelayChainOrigin: RuntimeOrigin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub Ancestry: MultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
+	// Tellor
+	pub TellorStakingContractMultilocation: MultiLocation = MultiLocation {
+		parents: 1,
+		interior: Junctions::X2(
+			Parachain(MOONBASE),
+			AccountKey20 { network: Any, key: super::TellorStakingContractAddress::get() })
+	};
+	pub TellorPalletAccount: AccountId = TellorPalletId::get().into_account_truncating();
 }
 
 /// Type for specifying how a `MultiLocation` can be converted into an `AccountId`. This is used
@@ -37,6 +59,8 @@ pub type LocationToAccountId = (
 	SiblingParachainConvertsVia<Sibling, AccountId>,
 	// Straight up local `AccountId32` origins just alias directly to `AccountId`.
 	AccountId32Aliases<RelayNetwork, AccountId>,
+	// Map Tellor staking contract multi-location to pallet account
+	LocationToPalletAccount<TellorStakingContractMultilocation, TellorPalletAccount, AccountId>,
 );
 
 /// Means for transacting assets on this chain.
@@ -44,7 +68,7 @@ pub type LocalAssetTransactor = CurrencyAdapter<
 	// Use this currency:
 	Balances,
 	// Use this currency when it is a fungible asset matching the given location or name:
-	IsConcrete<RelayLocation>,
+	IsConcrete<SelfReserve>,
 	// Do a simple punn to convert an AccountId32 MultiLocation into a native chain account ID:
 	LocationToAccountId,
 	// Our chain's account ID type (we can't get away without mentioning it explicitly):
@@ -152,13 +176,25 @@ impl ShouldExecute for DenyReserveTransferToRelayChain {
 	}
 }
 
+match_types! {
+	pub type Moonbeam: impl Contains<MultiLocation> = {
+		MultiLocation { parents: 1, interior: X1(Parachain(MOONBASE)) }
+	};
+}
+
 pub type Barrier = DenyThenTry<
 	DenyReserveTransferToRelayChain,
 	(
 		TakeWeightCredit,
+		// Taken from moonbeam
+		AllowTopLevelPaidExecutionDescendOriginFirst<Moonbeam>,
 		AllowTopLevelPaidExecutionFrom<Everything>,
+		// Parent and its exec plurality get free execution
 		AllowUnpaidExecutionFrom<ParentOrParentsExecutivePlurality>,
-		// ^^^ Parent and its exec plurality get free execution
+		// Expected responses are OK.
+		AllowKnownQueryResponses<PolkadotXcm>,
+		// Subscriptions for version tracking are OK.
+		AllowSubscriptionsFrom<Everything>,
 	),
 >;
 
@@ -174,8 +210,7 @@ impl xcm_executor::Config for XcmConfig {
 	type LocationInverter = LocationInverter<Ancestry>;
 	type Barrier = Barrier;
 	type Weigher = FixedWeightBounds<UnitWeightCost, RuntimeCall, MaxInstructions>;
-	type Trader =
-		UsingComponents<WeightToFee, RelayLocation, AccountId, Balances, ToAuthor<Runtime>>;
+	type Trader = UsingComponents<WeightToFee, SelfReserve, AccountId, Balances, ToAuthor<Runtime>>;
 	type ResponseHandler = PolkadotXcm;
 	type AssetTrap = PolkadotXcm;
 	type AssetClaims = PolkadotXcm;
@@ -218,4 +253,68 @@ impl pallet_xcm::Config for Runtime {
 impl cumulus_pallet_xcm::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type XcmExecutor = XcmExecutor<XcmConfig>;
+}
+
+// NOTE: taken from moonbeam's xcm_primitives::barriers::AllowTopLevelPaidExecutionDescendOriginFirst
+/// Barrier allowing a top level paid message with DescendOrigin instruction first
+pub struct AllowTopLevelPaidExecutionDescendOriginFirst<T>(PhantomData<T>);
+impl<T: Contains<MultiLocation>> ShouldExecute for AllowTopLevelPaidExecutionDescendOriginFirst<T> {
+	fn should_execute<Call>(
+		origin: &MultiLocation,
+		message: &mut Xcm<Call>,
+		max_weight: u64,
+		_weight_credit: &mut u64,
+	) -> Result<(), ()> {
+		log::trace!(
+			target: "xcm::barriers",
+			"AllowTopLevelPaidExecutionDescendOriginFirst origin:
+			{:?}, message: {:?}, max_weight: {:?}, weight_credit: {:?}",
+			origin, message, max_weight, _weight_credit,
+		);
+		ensure!(T::contains(origin), ());
+		let mut iter = message.0.iter_mut();
+		// Make sure the first instruction is DescendOrigin
+		iter.next()
+			.filter(|instruction| matches!(instruction, DescendOrigin(_)))
+			.ok_or(())?;
+
+		// Then WithdrawAsset
+		iter.next()
+			.filter(|instruction| matches!(instruction, WithdrawAsset(_)))
+			.ok_or(())?;
+
+		// Then BuyExecution
+		let i = iter.next().ok_or(())?;
+		match i {
+			BuyExecution { weight_limit: Limited(ref mut weight), .. } if *weight >= max_weight => {
+				*weight = max_weight;
+				Ok(())
+			},
+			BuyExecution { ref mut weight_limit, .. } if weight_limit == &Unlimited => {
+				*weight_limit = Limited(max_weight);
+				Ok(())
+			},
+			_ => Err(()),
+		}
+	}
+}
+
+pub struct LocationToPalletAccount<Location, Account, AccountId>(
+	PhantomData<Location>,
+	PhantomData<Account>,
+	PhantomData<AccountId>,
+);
+impl<
+		Location: Get<MultiLocation>,
+		Account: Get<AccountId>,
+		AccountId: Clone + sp_std::fmt::Debug,
+	> Convert<MultiLocation, AccountId> for LocationToPalletAccount<Location, Account, AccountId>
+{
+	fn convert(location: MultiLocation) -> Result<AccountId, MultiLocation> {
+		if location == Location::get() {
+			Ok(Account::get())
+		} else {
+			Err(location)
+		}
+	}
 }

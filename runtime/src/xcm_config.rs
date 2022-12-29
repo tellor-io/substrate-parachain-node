@@ -40,11 +40,11 @@ parameter_types! {
 	pub RelayChainOrigin: RuntimeOrigin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub Ancestry: MultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
 	// Tellor
-	pub TellorStakingContractMultilocation: MultiLocation = MultiLocation {
+	pub TellorContractMultilocation: MultiLocation = MultiLocation {
 		parents: 1,
 		interior: Junctions::X2(
 			Parachain(MOONBASE),
-			AccountKey20 { network: Any, key: super::TellorStakingContractAddress::get() })
+			AccountKey20 { network: Any, key: super::TellorContractAddress::get() })
 	};
 	pub TellorPalletAccount: AccountId = TellorPalletId::get().into_account_truncating();
 }
@@ -59,8 +59,8 @@ pub type LocationToAccountId = (
 	SiblingParachainConvertsVia<Sibling, AccountId>,
 	// Straight up local `AccountId32` origins just alias directly to `AccountId`.
 	AccountId32Aliases<RelayNetwork, AccountId>,
-	// Map Tellor staking contract multi-location to pallet account
-	LocationToPalletAccount<TellorStakingContractMultilocation, TellorPalletAccount, AccountId>,
+	// Map Tellor contract multi-location to pallet account
+	LocationToPalletAccount<TellorContractMultilocation, TellorPalletAccount, AccountId>,
 );
 
 /// Means for transacting assets on this chain.

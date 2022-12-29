@@ -41,7 +41,10 @@ pub mod pallet {
 		type PalletId: Get<PalletId>;
 
 		#[pallet::constant]
-		type ContractAddress: Get<Address>;
+		type StakingContractAddress: Get<Address>;
+
+		#[pallet::constant]
+		type GovernanceContractAddress: Get<Address>;
 
 		#[pallet::constant]
 		type ParaId: Get<u32>;
@@ -113,7 +116,8 @@ pub mod pallet {
 			// Send message to begin dispute using pallet account as origin
 			let origin = RawOrigin::Signed(T::PalletId::get().into_account_truncating()).into();
 			let begin_dispute = contracts::begin_dispute(T::ParaId::get());
-			let message = crate::xcm::build_message::<T>(T::ContractAddress::get(), begin_dispute);
+			let message =
+				crate::xcm::build_message::<T>(T::GovernanceContractAddress::get(), begin_dispute);
 			T::Xcm::send(origin, crate::xcm::destination::<T>(), message)?;
 
 			Ok(().into())

@@ -468,6 +468,7 @@ impl tellor::Config for Runtime {
 	type ContractAddress = TellorStakingContractAddress;
 	type ParaId = ParachainId;
 	type PalletIndex = PalletIndex;
+	type PalletsOrigin = OriginCaller;
 	type Xcm = Runtime;
 }
 

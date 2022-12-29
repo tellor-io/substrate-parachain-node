@@ -23,7 +23,7 @@ pub mod pallet {
 	use super::traits::Xcm;
 	use crate::ethereum_xcm::contracts;
 	use frame_support::{dispatch::DispatchResultWithPostInfo, pallet_prelude::*, PalletId};
-	use frame_system::pallet_prelude::*;
+	use frame_system::{pallet_prelude::*, RawOrigin};
 	use sp_core::{H160, U256};
 	use sp_runtime::traits::AccountIdConversion;
 	use sp_std::vec;
@@ -48,6 +48,11 @@ pub mod pallet {
 
 		#[pallet::constant]
 		type PalletIndex: Get<u8>;
+
+		/// The caller origin, overarching type of all pallets origins.
+		type PalletsOrigin: Parameter +
+			Into<<Self as frame_system::Config>::RuntimeOrigin> +
+			IsType<<<Self as frame_system::Config>::RuntimeOrigin as frame_support::traits::OriginTrait>::PalletsOrigin>;
 
 		type Xcm: Xcm<Self>;
 	}
@@ -82,36 +87,31 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		// Notification of stake from staking contract
+		#[pallet::call_index(0)]
 		#[pallet::weight(Weight::from_ref_time(10_000) + T::DbWeight::get().writes(1))]
-		pub fn report(
+		pub fn report_stake(
 			origin: OriginFor<T>,
 			staker: Address,
 			amount: Amount,
 		) -> DispatchResultWithPostInfo {
+			// ensure origin is pallet
 			let who = ensure_signed(origin.clone())?;
 			ensure!(who == T::PalletId::get().into_account_truncating(), Error::<T>::AccessDenied);
+
 			Self::deposit_event(Event::StakeReported { staker, amount });
 			Ok(().into())
 		}
 
-		#[pallet::weight(Weight::from_ref_time(10_000) + T::DbWeight::get().writes(1))]
-		pub fn set_contract_address(
-			origin: OriginFor<T>,
-			address: Address,
-		) -> DispatchResultWithPostInfo {
-			ensure_root(origin.clone())?;
-			ContractAddress::<T>::set(Some(address));
-			Self::deposit_event(Event::ContractAddressSet { address });
-			Ok(().into())
-		}
-
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::call_index(0)]
+		#[pallet::call_index(1)]
 		#[pallet::weight(Weight::from_ref_time(10_000) + T::DbWeight::get().writes(1))]
 		pub fn begin_dispute(origin: OriginFor<T>) -> DispatchResultWithPostInfo {
-			let _who = ensure_signed(origin.clone())?;
+			let _who = ensure_signed(origin)?;
 
+			// todo: lock dispute fee
+
+			// Send message to begin dispute using pallet account as origin
+			let origin = RawOrigin::Signed(T::PalletId::get().into_account_truncating()).into();
 			let begin_dispute = contracts::begin_dispute(T::ParaId::get());
 			let message = crate::xcm::build_message::<T>(T::ContractAddress::get(), begin_dispute);
 			T::Xcm::send(origin, crate::xcm::destination::<T>(), message)?;

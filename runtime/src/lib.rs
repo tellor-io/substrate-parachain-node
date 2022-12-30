@@ -461,7 +461,7 @@ parameter_types! {
 	pub const TellorContractAddress : [u8;20] = [192,30,231,241,14,164,175,70,115,207,255,98,113,14,29,119,146,171,168,243];
 	// Sending
 	pub const TellorStakingContractAddress : [u8;20] = [151,9,81,161,47,151,94,103,98,72,42,202,129,229,125,90,42,78,115,244];
-	pub const TellorGovernanceContractAddress : [u8;20] = [62,214,33,55,197,219,146,124,177,55,194,100,85,150,145,22,191,12,35,203];
+	pub const TellorGovernanceContractAddress : [u8;20] = [150,44,9,64,215,46,125,182,201,165,248,31,28,168,125,141,178,184,42,35];
 	pub const PalletIndex: u8 = 40; // todo: read from runtime
 }
 

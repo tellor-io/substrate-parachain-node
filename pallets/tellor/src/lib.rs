@@ -71,17 +71,18 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		RegistrationSent,
-		StakeReported { staker: Address, amount: Amount },
-		ContractAddressSet { address: Address },
+		StakeReported {
+			// The (remote) address of the staker.
+			staker: Address,
+			// The (local) address of the oracle reporter.
+			reporter: T::AccountId,
+			amount: Amount,
+		},
 	}
 
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
 		AccessDenied,
 	}
 
@@ -96,22 +97,26 @@ pub mod pallet {
 		pub fn report_stake(
 			origin: OriginFor<T>,
 			staker: Address,
+			reporter: T::AccountId,
 			amount: Amount,
 		) -> DispatchResultWithPostInfo {
-			// ensure origin is pallet
+			// ensure origin is pallet account
 			let who = ensure_signed(origin.clone())?;
 			ensure!(who == T::PalletId::get().into_account_truncating(), Error::<T>::AccessDenied);
 
-			Self::deposit_event(Event::StakeReported { staker, amount });
+			// todo: reclaim some xcm fees from reporter?
+
+			Self::deposit_event(Event::StakeReported { staker, reporter, amount });
 			Ok(().into())
 		}
 
+		// Sending notification to governance contract
 		#[pallet::call_index(1)]
 		#[pallet::weight(Weight::from_ref_time(10_000) + T::DbWeight::get().writes(1))]
 		pub fn begin_dispute(origin: OriginFor<T>) -> DispatchResultWithPostInfo {
 			let _who = ensure_signed(origin)?;
 
-			// todo: lock dispute fee
+			// todo: lock dispute fee etc.
 
 			// Send message to begin dispute using pallet account as origin
 			let origin = RawOrigin::Signed(T::PalletId::get().into_account_truncating()).into();
@@ -122,25 +127,5 @@ pub mod pallet {
 
 			Ok(().into())
 		}
-
-		// /// An example dispatchable that may throw a custom error.
-		// #[pallet::call_index(1)]
-		// #[pallet::weight(Weight::from_ref_time(10_000) + T::DbWeight::get().reads_writes(1,1))]
-		// pub fn cause_error(origin: OriginFor<T>) -> DispatchResultWithPostInfo {
-		// 	let _who = ensure_signed(origin)?;
-		//
-		// 	// Read a value from storage.
-		// 	match <Something<T>>::get() {
-		// 		// Return an error if the value has not been set.
-		// 		None => Err(Error::<T>::NoneValue)?,
-		// 		Some(old) => {
-		// 			// Increment the value read from storage; will error in the event of overflow.
-		// 			let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-		// 			// Update the value in storage with the incremented result.
-		// 			<Something<T>>::put(new);
-		// 			Ok(().into())
-		// 		},
-		// 	}
-		// }
 	}
 }

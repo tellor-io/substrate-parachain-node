@@ -5,7 +5,7 @@ use super::{
 use core::marker::PhantomData;
 use frame_support::{
 	ensure, log, match_types, parameter_types,
-	traits::{Contains, Everything, Nothing},
+	traits::{Contains, Everything, Nothing, OriginTrait},
 };
 use pallet_xcm::XcmPassthrough;
 use polkadot_parachain::primitives::Sibling;
@@ -27,7 +27,7 @@ use xcm_builder::{
 	UsingComponents,
 };
 use xcm_executor::{
-	traits::{Convert, ShouldExecute},
+	traits::{Convert, ConvertOrigin, ShouldExecute},
 	XcmExecutor,
 };
 
@@ -46,6 +46,7 @@ parameter_types! {
 			Parachain(MOONBASE),
 			AccountKey20 { network: Any, key: super::TellorContractAddress::get() })
 	};
+	pub TellorStakingContractOrigin: RuntimeOrigin = tellor::Origin::Staking.into();
 	pub TellorPalletAccount: AccountId = TellorPalletId::get().into_account_truncating();
 }
 
@@ -81,6 +82,8 @@ pub type LocalAssetTransactor = CurrencyAdapter<
 /// ready for dispatching a transaction with Xcm's `Transact`. There is an `OriginKind` which can
 /// biases the kind of local `Origin` it will become.
 pub type XcmOriginToTransactDispatchOrigin = (
+	// Tellor controller contract location converter: converts origin of Tellor contract on relevant smart contract parachain to Tellor pallet account
+	LocationToPalletOrigin<TellorContractMultilocation, TellorStakingContractOrigin, RuntimeOrigin>,
 	// Sovereign account converter; this attempts to derive an `AccountId` from the origin location
 	// using `LocationToAccountId` and then turn that into the usual `Signed` origin. Useful for
 	// foreign chains who want to have a local sovereign account on this chain which they control.
@@ -300,9 +303,7 @@ impl<T: Contains<MultiLocation>> ShouldExecute for AllowTopLevelPaidExecutionDes
 }
 
 pub struct LocationToPalletAccount<Location, Account, AccountId>(
-	PhantomData<Location>,
-	PhantomData<Account>,
-	PhantomData<AccountId>,
+	PhantomData<(Location, Account, AccountId)>,
 );
 impl<
 		Location: Get<MultiLocation>,
@@ -315,6 +316,35 @@ impl<
 			Ok(Account::get())
 		} else {
 			Err(location)
+		}
+	}
+}
+
+pub struct LocationToPalletOrigin<Location, PalletOrigin, RuntimeOrigin>(
+	PhantomData<(Location, PalletOrigin, RuntimeOrigin)>,
+);
+impl<
+		Location: Get<MultiLocation>,
+		PalletOrigin: Get<RuntimeOrigin>,
+		RuntimeOrigin: OriginTrait,
+	> ConvertOrigin<RuntimeOrigin> for LocationToPalletOrigin<Location, PalletOrigin, RuntimeOrigin>
+where
+	RuntimeOrigin: sp_std::fmt::Debug,
+	RuntimeOrigin::AccountId: Clone + sp_std::fmt::Debug,
+{
+	fn convert_origin(
+		origin: impl Into<MultiLocation>,
+		kind: OriginKind,
+	) -> Result<RuntimeOrigin, MultiLocation> {
+		let origin = origin.into();
+		log::trace!(
+			target: "xcm::origin_conversion",
+			"LocationToPalletOrigin origin: {:?}, kind: {:?}",
+			origin, kind,
+		);
+		match kind {
+			OriginKind::SovereignAccount if origin == Location::get() => Ok(PalletOrigin::get()),
+			_ => Err(origin),
 		}
 	}
 }

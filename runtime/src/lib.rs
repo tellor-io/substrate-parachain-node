@@ -467,6 +467,7 @@ parameter_types! {
 
 /// Configure the tellor pallet in pallets/tellor.
 impl tellor::Config for Runtime {
+	type RuntimeOrigin = RuntimeOrigin;
 	type RuntimeEvent = RuntimeEvent;
 	type PalletId = TellorPalletId;
 	type StakingContractAddress = TellorStakingContractAddress;
@@ -529,7 +530,7 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 
 		// Tellor
-		Tellor: tellor::{Pallet, Call, Storage, Event<T>}  = 40,
+		Tellor: tellor::{Pallet, Call, Storage, Event<T>, Origin}  = 40,
 	}
 );
 

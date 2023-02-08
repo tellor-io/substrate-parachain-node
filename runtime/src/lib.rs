@@ -12,7 +12,7 @@ pub mod xcm_config;
 use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
-use sp_core::{crypto::KeyTypeId, Get, OpaqueMetadata};
+use sp_core::{crypto::KeyTypeId, Get, OpaqueMetadata, H256};
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
 	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, Verify},
@@ -50,6 +50,7 @@ pub use sp_runtime::BuildStorage;
 
 // Polkadot imports
 use polkadot_runtime_common::{BlockHashCount, SlowAdjustingFeeUpdate};
+use sp_runtime::traits::Keccak256;
 
 use weights::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight};
 
@@ -467,31 +468,35 @@ parameter_types! {
 
 /// Configure the tellor pallet in pallets/tellor.
 impl tellor::Config for Runtime {
-	type RuntimeOrigin = RuntimeOrigin;
 	type RuntimeEvent = RuntimeEvent;
+	type RuntimeOrigin = RuntimeOrigin;
+	type Amount = Balance;
+	type DisputeId = u128;
+	type Fee = ();
+	type Governance = ();
+	type Hash = H256;
+	type Hasher = Keccak256;
+	type MaxClaimTimestamps = ();
+	type MaxFeedsPerQuery = ();
+	type MaxFundedFeeds = ();
+	type MaxQueriesPerReporter = ();
+	type MaxQueryDataLength = ();
+	type MaxTimestamps = ();
+	type MaxTipsPerQuery = ();
+	type MaxValueLength = ();
+	type MaxVotes = ();
 	type PalletId = TellorPalletId;
-	type StakingContractAddress = TellorStakingContractAddress;
-	type GovernanceContractAddress = TellorGovernanceContractAddress;
-	type ParaId = ParachainId;
-	type PalletIndex = PalletIndex;
-	type PalletsOrigin = OriginCaller;
-	type Xcm = Runtime;
+	type ParachainId = ();
+	type ReportingLock = ();
+	type Time = Timestamp;
+	type Token = Balances;
+	type Xcm = xcm_config::XcmRouter;
 }
 
 pub struct ParachainId;
 impl Get<u32> for ParachainId {
 	fn get() -> u32 {
 		ParachainInfo::get().into()
-	}
-}
-
-impl tellor::traits::Xcm<Runtime> for Runtime {
-	fn send(
-		origin: OriginFor<Runtime>,
-		dest: Box<VersionedMultiLocation>,
-		message: Box<VersionedXcm>,
-	) -> DispatchResult {
-		PolkadotXcm::send(origin, dest, message)
 	}
 }
 

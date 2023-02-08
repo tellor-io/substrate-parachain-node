@@ -21,9 +21,6 @@ log = { version = "0.4.17", default-features = false }
 scale-info = { version = "2.3.1", default-features = false, features = ["derive"] }
 smallvec = "1.10.0"
 
-# Local
-tellor = { path = "../pallets/tellor", default-features = false }
-
 # Substrate
 frame-benchmarking = { git = "https://github.com/paritytech/substrate", default-features = false, optional = true, "branch" = "polkadot-v0.9.37" }
 frame-executive = { git = "https://github.com/paritytech/substrate", default-features = false, "branch" = "polkadot-v0.9.37" }
@@ -72,6 +69,9 @@ cumulus-primitives-timestamp = { git = "https://github.com/paritytech/cumulus.gi
 cumulus-primitives-utility = { git = "https://github.com/paritytech/cumulus.git", branch = "polkadot-v0.9.37", default-features = false }
 pallet-collator-selection = { git = "https://github.com/paritytech/cumulus.git", branch = "polkadot-v0.9.37", default-features = false }
 parachain-info = { git = "https://github.com/paritytech/cumulus.git", branch = "polkadot-v0.9.37", default-features = false }
+
+# Tellor
+tellor = { git = "https://github.com/evilrobot-01/substrate-pallets", branch = "tellor", default-features = false }
 
 [features]
 default = [

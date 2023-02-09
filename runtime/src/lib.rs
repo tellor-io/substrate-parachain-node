@@ -27,7 +27,7 @@ use sp_version::RuntimeVersion;
 
 use frame_support::{
 	construct_runtime,
-	dispatch::{DispatchClass, DispatchResult},
+	dispatch::DispatchClass,
 	parameter_types,
 	traits::{ConstU32, ConstU64, ConstU8, Everything},
 	weights::{
@@ -38,7 +38,6 @@ use frame_support::{
 };
 use frame_system::{
 	limits::{BlockLength, BlockWeights},
-	pallet_prelude::OriginFor,
 	EnsureRoot,
 };
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -55,7 +54,7 @@ use sp_runtime::traits::Keccak256;
 use weights::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight};
 
 // XCM Imports
-use xcm::{latest::prelude::BodyId, opaque::VersionedXcm, VersionedMultiLocation};
+use xcm::latest::prelude::BodyId;
 use xcm_executor::XcmExecutor;
 
 /// Import the tellor pallet.
@@ -458,12 +457,6 @@ impl pallet_sudo::Config for Runtime {
 
 parameter_types! {
 	pub const TellorPalletId: PalletId = PalletId(*b"py/tellr");
-	// Receiving
-	pub const TellorContractAddress : [u8;20] = [192,30,231,241,14,164,175,70,115,207,255,98,113,14,29,119,146,171,168,243];
-	// Sending
-	pub const TellorStakingContractAddress : [u8;20] = [151,9,81,161,47,151,94,103,98,72,42,202,129,229,125,90,42,78,115,244];
-	pub const TellorGovernanceContractAddress : [u8;20] = [150,44,9,64,215,46,125,182,201,165,248,31,28,168,125,141,178,184,42,35];
-	pub const PalletIndex: u8 = 40; // todo: read from runtime
 }
 
 /// Configure the tellor pallet in pallets/tellor.
@@ -473,7 +466,7 @@ impl tellor::Config for Runtime {
 	type Amount = Balance;
 	type DisputeId = u128;
 	type Fee = ();
-	type Governance = ();
+	type Governance = xcm_config::TellorGovernance;
 	type Hash = H256;
 	type Hasher = Keccak256;
 	type MaxClaimTimestamps = ();
@@ -486,8 +479,9 @@ impl tellor::Config for Runtime {
 	type MaxValueLength = ();
 	type MaxVotes = ();
 	type PalletId = TellorPalletId;
-	type ParachainId = ();
+	type ParachainId = ParachainId;
 	type ReportingLock = ();
+	type Staking = xcm_config::TellorStaking;
 	type Time = Timestamp;
 	type Token = Balances;
 	type Xcm = xcm_config::XcmRouter;

@@ -40,13 +40,10 @@ parameter_types! {
 	pub RelayChainOrigin: RuntimeOrigin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub Ancestry: MultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
 	// Tellor
-	pub TellorContractMultilocation: MultiLocation = MultiLocation {
-		parents: 1,
-		interior: Junctions::X2(
-			Parachain(MOONBASE),
-			AccountKey20 { network: Any, key: super::TellorContractAddress::get() })
-	};
-	pub TellorStakingContractOrigin: RuntimeOrigin = tellor::Origin::Staking.into();
+	pub TellorGovernance: MultiLocation = tellor::xcm::controller(MOONBASE, [150,44,9,64,215,46,125,182,201,165,248,31,28,168,125,141,178,184,42,35]);
+	pub TellorGovernanceOrigin: RuntimeOrigin = tellor::Origin::Governance.into();
+	pub TellorStaking: MultiLocation = tellor::xcm::controller(MOONBASE, [151,9,81,161,47,151,94,103,98,72,42,202,129,229,125,90,42,78,115,244]);
+	pub TellorStakingOrigin: RuntimeOrigin = tellor::Origin::Staking.into();
 	pub TellorPalletAccount: AccountId = TellorPalletId::get().into_account_truncating();
 }
 
@@ -60,8 +57,9 @@ pub type LocationToAccountId = (
 	SiblingParachainConvertsVia<Sibling, AccountId>,
 	// Straight up local `AccountId32` origins just alias directly to `AccountId`.
 	AccountId32Aliases<RelayNetwork, AccountId>,
-	// Map Tellor contract multi-location to pallet account
-	LocationToPalletAccount<TellorContractMultilocation, TellorPalletAccount, AccountId>,
+	// Map Tellor controller contract multi-locations to Tellor pallet account
+	LocationToPalletAccount<TellorGovernance, TellorPalletAccount, AccountId>,
+	LocationToPalletAccount<TellorStaking, TellorPalletAccount, AccountId>,
 );
 
 /// Means for transacting assets on this chain.
@@ -82,8 +80,10 @@ pub type LocalAssetTransactor = CurrencyAdapter<
 /// ready for dispatching a transaction with Xcm's `Transact`. There is an `OriginKind` which can
 /// biases the kind of local `Origin` it will become.
 pub type XcmOriginToTransactDispatchOrigin = (
-	// Tellor controller contract location converter: converts origin of Tellor contract on relevant smart contract parachain to Tellor pallet account
-	LocationToPalletOrigin<TellorContractMultilocation, TellorStakingContractOrigin, RuntimeOrigin>,
+	// Tellor controller contract location converter: converts origin of Tellor controller contracts
+	// on relevant smart contract parachain to corresponding Tellor pallet origin
+	LocationToPalletOrigin<TellorGovernance, TellorGovernanceOrigin, RuntimeOrigin>,
+	LocationToPalletOrigin<TellorStaking, TellorStakingOrigin, RuntimeOrigin>,
 	// Sovereign account converter; this attempts to derive an `AccountId` from the origin location
 	// using `LocationToAccountId` and then turn that into the usual `Signed` origin. Useful for
 	// foreign chains who want to have a local sovereign account on this chain which they control.

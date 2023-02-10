@@ -5,12 +5,11 @@ use super::{
 use core::marker::PhantomData;
 use frame_support::{
 	ensure, log, match_types, parameter_types,
-	traits::{Contains, Everything, Nothing, OriginTrait},
+	traits::{Contains, Everything, Nothing},
 };
 use pallet_xcm::XcmPassthrough;
 use polkadot_parachain::primitives::Sibling;
 use polkadot_runtime_common::impls::ToAuthor;
-use sp_core::Get;
 use sp_runtime::traits::AccountIdConversion;
 use xcm::latest::{
 	prelude::{BuyExecution, DescendOrigin, WithdrawAsset, *},
@@ -37,7 +36,7 @@ parameter_types! {
 	pub RelayChainOrigin: RuntimeOrigin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub Ancestry: MultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
 	// Tellor
-	pub TellorGovernance: MultiLocation = tellor::xcm::controller(MOONBASE, [150,44,9,64,215,46,125,182,201,165,248,31,28,168,125,141,178,184,42,35]);
+	pub TellorGovernance: MultiLocation = tellor::xcm::controller(MOONBASE, [62,214,33,55,197,219,146,124,177,55,194,100,85,150,145,22,191,12,35,203]);
 	pub TellorGovernanceOrigin: RuntimeOrigin = tellor::Origin::Governance.into();
 	pub TellorStaking: MultiLocation = tellor::xcm::controller(MOONBASE, [151,9,81,161,47,151,94,103,98,72,42,202,129,229,125,90,42,78,115,244]);
 	pub TellorStakingOrigin: RuntimeOrigin = tellor::Origin::Staking.into();

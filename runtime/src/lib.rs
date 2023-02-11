@@ -480,6 +480,7 @@ impl tellor::Config for Runtime {
 	type MaxVotes = ();
 	type PalletId = TellorPalletId;
 	type ParachainId = ParachainId;
+	type Registry = xcm_config::TellorRegistry;
 	type ReportingLock = ();
 	type Staking = xcm_config::TellorStaking;
 	type Time = Timestamp;

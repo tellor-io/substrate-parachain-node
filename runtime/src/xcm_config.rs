@@ -36,6 +36,7 @@ parameter_types! {
 	pub RelayChainOrigin: RuntimeOrigin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub Ancestry: MultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
 	// Tellor
+	pub TellorRegistry: MultiLocation = tellor::xcm::controller(MOONBASE, [192,30,231,241,14,164,175,70,115,207,255,98,113,14,29,119,146,171,168,243]);
 	pub TellorGovernance: MultiLocation = tellor::xcm::controller(MOONBASE, [62,214,33,55,197,219,146,124,177,55,194,100,85,150,145,22,191,12,35,203]);
 	pub TellorGovernanceOrigin: RuntimeOrigin = tellor::Origin::Governance.into();
 	pub TellorStaking: MultiLocation = tellor::xcm::controller(MOONBASE, [151,9,81,161,47,151,94,103,98,72,42,202,129,229,125,90,42,78,115,244]);

@@ -10016,9 +10016,9 @@ checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
 
 [[package]]
 name = "signal-hook-registry"
-version = "1.4.0"
+version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e51e73328dc4ac0c7ccbda3a494dfa03df1de2f46018127f60c693f2648455b0"
+checksum = "d8229b473baa5980ac72ef434c4415e70c4b5e71b423043adb4ba059f89c99a1"
 dependencies = [
  "libc",
 ]
@@ -11201,7 +11201,7 @@ dependencies = [
 [[package]]
 name = "tellor"
 version = "0.1.0"
-source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor#3a21f74a9a2cde1cf36f44e21977e2e2baf86166"
+source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor#11722e22e7c56f24afd85e300cc8ab384e17443e"
 dependencies = [
  "frame-benchmarking",
  "frame-support",

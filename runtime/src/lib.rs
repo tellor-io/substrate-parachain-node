@@ -473,10 +473,10 @@ impl tellor::Config for Runtime {
 	type MaxFeedsPerQuery = ();
 	type MaxFundedFeeds = ();
 	type MaxQueriesPerReporter = ();
-	type MaxQueryDataLength = ();
+	type MaxQueryDataLength = ConstU32<512>;
 	type MaxTimestamps = ();
 	type MaxTipsPerQuery = ();
-	type MaxValueLength = ();
+	type MaxValueLength = ConstU32<256>;
 	type MaxVotes = ();
 	type PalletId = TellorPalletId;
 	type ParachainId = ParachainId;

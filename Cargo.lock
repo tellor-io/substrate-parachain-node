@@ -11201,7 +11201,7 @@ dependencies = [
 [[package]]
 name = "tellor"
 version = "0.1.0"
-source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor#11722e22e7c56f24afd85e300cc8ab384e17443e"
+source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor#c36fcb75fc8708be2165617a71bed49f4c6bf393"
 dependencies = [
  "frame-benchmarking",
  "frame-support",

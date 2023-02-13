@@ -6309,6 +6309,7 @@ dependencies = [
  "sp-version",
  "substrate-wasm-builder",
  "tellor 0.1.0 (git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor)",
+ "tellor-runtime-api",
  "xcm",
  "xcm-builder",
  "xcm-executor",
@@ -11201,19 +11202,29 @@ dependencies = [
 [[package]]
 name = "tellor"
 version = "0.1.0"
-source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor#c36fcb75fc8708be2165617a71bed49f4c6bf393"
+source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor#dcc76c5a26e28f56f7a017cf4a7545ddc73346c8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
  "parity-scale-codec",
  "scale-info",
- "sp-api",
  "sp-core",
  "sp-runtime",
  "sp-std",
  "xcm",
  "xcm-executor",
+]
+
+[[package]]
+name = "tellor-runtime-api"
+version = "0.1.0"
+source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor#dcc76c5a26e28f56f7a017cf4a7545ddc73346c8"
+dependencies = [
+ "parity-scale-codec",
+ "sp-api",
+ "sp-std",
+ "tellor 0.1.0 (git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor)",
 ]
 
 [[package]]
@@ -11273,10 +11284,11 @@ checksum = "3bf63baf9f5039dadc247375c29eb13706706cfde997d0330d05aa63a77d8820"
 
 [[package]]
 name = "thread_local"
-version = "1.1.4"
+version = "1.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5516c27b78311c50bf42c071425c560ac799b11c30b31f87e3081965fe5e0180"
+checksum = "3fdd6f064ccff2d6567adcb3873ca630700f00b5ad3f060c25b5dcfd9a4ce152"
 dependencies = [
+ "cfg-if",
  "once_cell",
 ]
 
@@ -11470,9 +11482,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc6a3b08b64e6dfad376fa2432c7b1f01522e37a623c3050bc95db2d3ff21583"
+checksum = "5427d89453009325de0d8f342c9490009f76e999cb7672d77e46267448f7e6b2"
 dependencies = [
  "bytes",
  "futures-core",
@@ -12477,9 +12489,9 @@ dependencies = [
 
 [[package]]
 name = "webrtc-ice"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "494483fbb2f5492620871fdc78b084aed8807377f6e3fe88b2e49f0a9c9c41d7"
+checksum = "465a03cc11e9a7d7b4f9f99870558fe37a102b65b93f8045392fef7c67b39e80"
 dependencies = [
  "arc-swap",
  "async-trait",

@@ -12,7 +12,7 @@ pub mod xcm_config;
 use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
-use sp_core::{crypto::KeyTypeId, Get, OpaqueMetadata, H256};
+use sp_core::{bounded::BoundedVec, crypto::KeyTypeId, Get, OpaqueMetadata, H256};
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
 	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, Verify},
@@ -121,6 +121,9 @@ pub type Executive = frame_executive::Executive<
 	Runtime,
 	AllPalletsWithSystem,
 >;
+
+/// A timestamp: milliseconds since the unix epoch.
+type Moment = u64;
 
 /// Handles converting a weight scalar to a fee value, based on the scale and granularity of the
 /// node's balance type.
@@ -312,8 +315,7 @@ impl frame_system::Config for Runtime {
 }
 
 impl pallet_timestamp::Config for Runtime {
-	/// A timestamp: milliseconds since the unix epoch.
-	type Moment = u64;
+	type Moment = Moment;
 	type OnTimestampSet = Aura;
 	type MinimumPeriod = ConstU64<{ SLOT_DURATION / 2 }>;
 	type WeightInfo = ();
@@ -458,8 +460,7 @@ impl pallet_sudo::Config for Runtime {
 parameter_types! {
 	pub const TellorPalletId: PalletId = PalletId(*b"py/tellr");
 }
-
-/// Configure the tellor pallet in pallets/tellor.
+/// Configure the tellor pallet
 impl tellor::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeOrigin = RuntimeOrigin;
@@ -549,6 +550,9 @@ mod benches {
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
 	);
 }
+
+pub type QueryId = <Runtime as tellor::Config>::Hash;
+pub type Value = BoundedVec<u8, <Runtime as tellor::Config>::MaxValueLength>;
 
 impl_runtime_apis! {
 	impl sp_consensus_aura::AuraApi<Block, AuraId> for Runtime {
@@ -671,6 +675,17 @@ impl_runtime_apis! {
 	impl cumulus_primitives_core::CollectCollationInfo<Block> for Runtime {
 		fn collect_collation_info(header: &<Block as BlockT>::Header) -> cumulus_primitives_core::CollationInfo {
 			ParachainSystem::collect_collation_info(header)
+		}
+	}
+
+	// Tellor Oracle Api
+	impl tellor_runtime_api::OracleApi<Block, BlockNumber, QueryId, Moment, Value> for Runtime {
+		fn get_block_number_by_timestamp(query_id: QueryId, timestamp: Moment) -> Option<BlockNumber>{
+			Tellor::get_block_number_by_timestamp(query_id, timestamp)
+		}
+
+		fn get_current_value(query_id: QueryId) -> Option<Value> {
+			Tellor::get_current_value(query_id)
 		}
 	}
 

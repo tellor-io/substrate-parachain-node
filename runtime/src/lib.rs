@@ -679,7 +679,7 @@ impl_runtime_apis! {
 	}
 
 	// Tellor Oracle Api
-	impl tellor_runtime_api::OracleApi<Block, BlockNumber, QueryId, Moment, Value> for Runtime {
+	impl tellor_runtime_api::TellorOracle<Block, BlockNumber, QueryId, Moment, Value> for Runtime {
 		fn get_block_number_by_timestamp(query_id: QueryId, timestamp: Moment) -> Option<BlockNumber>{
 			Tellor::get_block_number_by_timestamp(query_id, timestamp)
 		}

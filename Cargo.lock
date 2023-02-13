@@ -11202,7 +11202,7 @@ dependencies = [
 [[package]]
 name = "tellor"
 version = "0.1.0"
-source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor#dcc76c5a26e28f56f7a017cf4a7545ddc73346c8"
+source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor#64a3533304aa490be804933ca352e94fb2224031"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11219,7 +11219,7 @@ dependencies = [
 [[package]]
 name = "tellor-runtime-api"
 version = "0.1.0"
-source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor#dcc76c5a26e28f56f7a017cf4a7545ddc73346c8"
+source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor#64a3533304aa490be804933ca352e94fb2224031"
 dependencies = [
  "parity-scale-codec",
  "sp-api",

@@ -551,7 +551,10 @@ mod benches {
 	);
 }
 
+pub type Amount = <Runtime as tellor::Config>::Amount;
 pub type QueryId = <Runtime as tellor::Config>::Hash;
+pub type StakeInfo =
+	tellor::StakeInfo<Amount, <Runtime as tellor::Config>::MaxQueriesPerReporter, QueryId, Moment>;
 pub type Value = BoundedVec<u8, <Runtime as tellor::Config>::MaxValueLength>;
 
 impl_runtime_apis! {
@@ -679,7 +682,7 @@ impl_runtime_apis! {
 	}
 
 	// Tellor Oracle Api
-	impl tellor_runtime_api::TellorOracle<Block, BlockNumber, QueryId, Moment, Value> for Runtime {
+	impl tellor_runtime_api::TellorOracle<Block, AccountId, Amount, BlockNumber, QueryId, StakeInfo, Moment, Value> for Runtime {
 		fn get_block_number_by_timestamp(query_id: QueryId, timestamp: Moment) -> Option<BlockNumber>{
 			Tellor::get_block_number_by_timestamp(query_id, timestamp)
 		}
@@ -687,6 +690,43 @@ impl_runtime_apis! {
 		fn get_current_value(query_id: QueryId) -> Option<Value> {
 			Tellor::get_current_value(query_id)
 		}
+
+		fn get_data_before(_: QueryId, _: Moment) -> Option<(Value, Moment)> { todo!() }
+		fn get_new_value_count_by_query_id(_: QueryId) -> u32 { todo!() }
+		fn get_report_details(_: QueryId, _: Moment) -> Option<(AccountId, bool)> { todo!() }
+		fn get_reporter_by_timestamp(_: QueryId, _: Moment) -> Option<AccountId> { todo!() }
+		fn get_reporter_last_timestamp(_: AccountId) -> Option<Moment> { todo!() }
+
+		fn get_reporting_lock() -> Moment {
+			Tellor::get_reporting_lock()
+		}
+
+		fn get_reports_submitted_by_address(_: AccountId) -> u32 { todo!() }
+		fn get_reports_submitted_by_address_and_query_id(_: AccountId, _: QueryId) -> u32 { todo!() }
+
+		fn get_stake_amount() -> Amount {
+			Tellor::get_stake_amount()
+		}
+
+		fn get_staker_info(staker: AccountId) -> Option<StakeInfo> {
+			Tellor::get_staker_info(staker)
+		}
+
+		fn get_time_of_last_new_value() -> Moment { todo!() }
+		fn get_timestamp_by_query_id_and_index(_: QueryId, _: u32) -> Option<Moment> { todo!() }
+		fn get_index_for_data_before(_: QueryId, _: Moment) -> (bool, u32) { todo!() }
+		fn get_timestamp_index_by_timestamp(_: QueryId, _: Moment) -> u32 { todo!() }
+
+		fn get_total_stake_amount() -> Amount {
+			Tellor::get_total_stake_amount()
+		}
+
+		fn get_total_stakers() -> u128 {
+			Tellor::get_total_stakers()
+		}
+
+		fn is_in_dispute(_: QueryId, _: Moment) -> bool { todo!() }
+		fn retrieve_data(_: QueryId, _: Moment) -> Option<Value> { todo!() }
 	}
 
 	#[cfg(feature = "try-runtime")]

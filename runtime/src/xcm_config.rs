@@ -11,6 +11,7 @@ use pallet_xcm::XcmPassthrough;
 use polkadot_parachain::primitives::Sibling;
 use polkadot_runtime_common::impls::ToAuthor;
 use sp_runtime::traits::AccountIdConversion;
+use tellor::ContractLocation;
 use xcm::latest::{
 	prelude::{BuyExecution, DescendOrigin, WithdrawAsset, *},
 	MultiLocation, Weight as XCMWeight,
@@ -36,10 +37,10 @@ parameter_types! {
 	pub RelayChainOrigin: RuntimeOrigin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub Ancestry: MultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
 	// Tellor
-	pub TellorRegistry: MultiLocation = tellor::xcm::controller(MOONBASE, [192,30,231,241,14,164,175,70,115,207,255,98,113,14,29,119,146,171,168,243]);
-	pub TellorGovernance: MultiLocation = tellor::xcm::controller(MOONBASE, [62,214,33,55,197,219,146,124,177,55,194,100,85,150,145,22,191,12,35,203]);
+	pub TellorRegistry: ContractLocation = (MOONBASE, [192,30,231,241,14,164,175,70,115,207,255,98,113,14,29,119,146,171,168,243]).into();
+	pub TellorGovernance: ContractLocation = (MOONBASE, [62,214,33,55,197,219,146,124,177,55,194,100,85,150,145,22,191,12,35,203]).into();
 	pub TellorGovernanceOrigin: RuntimeOrigin = tellor::Origin::Governance.into();
-	pub TellorStaking: MultiLocation = tellor::xcm::controller(MOONBASE, [151,9,81,161,47,151,94,103,98,72,42,202,129,229,125,90,42,78,115,244]);
+	pub TellorStaking: ContractLocation = (MOONBASE, [151,9,81,161,47,151,94,103,98,72,42,202,129,229,125,90,42,78,115,244]).into();
 	pub TellorStakingOrigin: RuntimeOrigin = tellor::Origin::Staking.into();
 	pub TellorPalletAccount: AccountId = TellorPalletId::get().into_account_truncating();
 }
@@ -54,9 +55,9 @@ pub type LocationToAccountId = (
 	SiblingParachainConvertsVia<Sibling, AccountId>,
 	// Straight up local `AccountId32` origins just alias directly to `AccountId`.
 	AccountId32Aliases<RelayNetwork, AccountId>,
-	// Map Tellor controller contract multi-locations to Tellor pallet account
-	tellor::xcm::LocationToPalletAccount<TellorGovernance, TellorPalletAccount, AccountId>,
-	tellor::xcm::LocationToPalletAccount<TellorStaking, TellorPalletAccount, AccountId>,
+	// Map Tellor controller contract locations to Tellor pallet account
+	tellor::LocationToAccount<TellorGovernance, TellorPalletAccount, AccountId>,
+	tellor::LocationToAccount<TellorStaking, TellorPalletAccount, AccountId>,
 );
 
 /// Means for transacting assets on this chain.
@@ -79,8 +80,8 @@ pub type LocalAssetTransactor = CurrencyAdapter<
 pub type XcmOriginToTransactDispatchOrigin = (
 	// Tellor controller contract location converter: converts origin of Tellor controller contracts
 	// on relevant smart contract parachain to corresponding Tellor pallet origin
-	tellor::xcm::LocationToPalletOrigin<TellorGovernance, TellorGovernanceOrigin, RuntimeOrigin>,
-	tellor::xcm::LocationToPalletOrigin<TellorStaking, TellorStakingOrigin, RuntimeOrigin>,
+	tellor::LocationToOrigin<TellorGovernance, TellorGovernanceOrigin, RuntimeOrigin>,
+	tellor::LocationToOrigin<TellorStaking, TellorStakingOrigin, RuntimeOrigin>,
 	// Sovereign account converter; this attempts to derive an `AccountId` from the origin location
 	// using `LocationToAccountId` and then turn that into the usual `Signed` origin. Useful for
 	// foreign chains who want to have a local sovereign account on this chain which they control.

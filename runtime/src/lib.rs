@@ -463,6 +463,8 @@ impl pallet_sudo::Config for Runtime {
 }
 
 type DisputeId = u32;
+type Price = u32;
+
 parameter_types! {
 	pub const TellorPalletId: PalletId = PalletId(*b"py/tellr");
 }
@@ -493,7 +495,7 @@ impl tellor::Config for Runtime {
 	type MaxVoteRounds = ConstU32<10>;
 	type PalletId = TellorPalletId;
 	type ParachainId = ParachainId;
-	type Price = u32;
+	type Price = Price;
 	type RegistrationOrigin = EnsureRoot<AccountId>;
 	type Registry = xcm_config::TellorRegistry;
 	type ReportingLock = ConstU64<{ 12 * HOUR_IN_MILLISECONDS }>;
@@ -526,6 +528,18 @@ impl Get<u32> for ParachainId {
 	fn get() -> u32 {
 		ParachainInfo::get().into()
 	}
+}
+
+/// Configure the tellor-sample pallet
+impl tellor_sample::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type ConfigureOrigin = EnsureRoot<AccountId>;
+	type Price = Price;
+	type QueryId = H256;
+	type Tellor = Tellor;
+	type Time = Timestamp;
+	type Timestamp = Moment;
+	type Value = u32;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -564,6 +578,7 @@ construct_runtime!(
 
 		// Tellor
 		Tellor: tellor::{Pallet, Call, Storage, Event<T>, Origin}  = 40,
+		TellorSample: tellor_sample::{Pallet, Call, Storage, Event<T>}  = 41,
 	}
 );
 

@@ -743,8 +743,8 @@ impl_runtime_apis! {
 			Tellor::get_data_feed(feed_id)
 		}
 
-		fn get_funded_feed_details(feed_id: FeedId) -> Vec<FeedDetailsWithQueryData<Amount, Moment>> {
-			Tellor::get_funded_feed_details(feed_id).into_iter()
+		fn get_funded_feed_details() -> Vec<FeedDetailsWithQueryData<Amount, Moment>> {
+			Tellor::get_funded_feed_details().into_iter()
 			.map(|(details, query_data)| FeedDetailsWithQueryData {
 				details: details,
 				query_data: query_data.to_vec()})
@@ -792,7 +792,7 @@ impl_runtime_apis! {
 			Tellor::get_reward_claimed_status(feed_id, query_id, timestamp)
 		}
 
-		fn get_reward_claim_status_list(feed_id: FeedId, query_id: QueryId, timestamps: Vec<Moment>) -> Vec<Option<bool>>{
+		fn get_reward_claim_status_list(feed_id: FeedId, query_id: QueryId, timestamps: Vec<Moment>) -> Vec<bool>{
 			Tellor::get_reward_claim_status_list(feed_id, query_id, timestamps)
 		}
 

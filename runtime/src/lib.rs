@@ -60,9 +60,10 @@ use xcm_executor::XcmExecutor;
 
 /// Import the tellor pallet.
 use tellor::{
-	EnsureGovernance, EnsureStaking, FeedDetails, Tip, HOUR_IN_MILLISECONDS, WEEK_IN_MILLISECONDS,
+	EnsureGovernance, EnsureStaking, FeedDetails, Tip, VoteResult, DAY_IN_MILLISECONDS,
+	HOUR_IN_MILLISECONDS, WEEK_IN_MILLISECONDS,
 };
-use tellor_runtime_api::{FeedDetailsWithQueryData, SingleTipWithQueryData};
+use tellor_runtime_api::{FeedDetailsWithQueryData, SingleTipWithQueryData, VoteInfo};
 use xcm::latest::{Junctions, MultiLocation, SendError, Xcm};
 
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
@@ -464,6 +465,7 @@ impl pallet_sudo::Config for Runtime {
 
 type DisputeId = u32;
 type Price = u32;
+type VoteCount = DisputeId;
 
 parameter_types! {
 	pub const TellorPalletId: PalletId = PalletId(*b"py/tellr");
@@ -477,6 +479,7 @@ impl tellor::Config for Runtime {
 	type ClaimBuffer = ConstU64<{ 12 * HOUR_IN_MILLISECONDS }>;
 	type ClaimPeriod = ConstU64<{ 4 * WEEK_IN_MILLISECONDS }>;
 	type DisputeId = DisputeId;
+	type DisputeRoundReportingPeriod = ConstU64<{ 1 * DAY_IN_MILLISECONDS }>;
 	type Fee = ConstU16<10>; // 1%
 	type Governance = xcm_config::TellorGovernance;
 	type GovernanceOrigin = EnsureGovernance;
@@ -504,6 +507,7 @@ impl tellor::Config for Runtime {
 	type Time = Timestamp;
 	type Token = Balances;
 	type ValueConverter = TellorConfig;
+	type WithdrawalPeriod = ConstU64<{ 7 * DAY_IN_MILLISECONDS }>;
 	type Xcm = TellorConfig;
 }
 
@@ -604,6 +608,7 @@ type QueryId = <Runtime as tellor::Config>::Hash;
 type StakeInfo =
 	tellor::StakeInfo<Amount, <Runtime as tellor::Config>::MaxQueriesPerReporter, QueryId, Moment>;
 type Value = BoundedVec<u8, <Runtime as tellor::Config>::MaxValueLength>;
+type VoteId = <Runtime as tellor::Config>::Hash;
 
 impl_runtime_apis! {
 	impl sp_consensus_aura::AuraApi<Block, AuraId> for Runtime {
@@ -797,7 +802,7 @@ impl_runtime_apis! {
 		}
 
 		fn get_tips_by_address(user: AccountId) -> Amount {
-			Tellor::get_tips_by_address(user)
+			Tellor::get_tips_by_address(&user)
 		}
 	}
 
@@ -836,7 +841,7 @@ impl_runtime_apis! {
 		}
 
 		fn get_reports_submitted_by_address(reporter: AccountId) -> u128 {
-			Tellor::get_reports_submitted_by_address(reporter)
+			Tellor::get_reports_submitted_by_address(&reporter)
 		}
 
 		fn get_reports_submitted_by_address_and_query_id(reporter: AccountId, query_id: QueryId) -> u128 {
@@ -885,13 +890,57 @@ impl_runtime_apis! {
 	}
 
 	// Tellor Governance Api
-	impl tellor_runtime_api::TellorGovernance<Block, AccountId, Amount, DisputeId, QueryId, Moment> for Runtime {
+	impl tellor_runtime_api::TellorGovernance<Block, AccountId, Amount, BlockNumber, DisputeId, QueryId, Moment, Value, VoteCount, VoteId> for Runtime {
 		fn did_vote(dispute_id: DisputeId, voter: AccountId) -> Option<bool>{
 			Tellor::did_vote(dispute_id, voter)
 		}
 
 		fn get_dispute_fee() -> Amount {
 			Tellor::get_dispute_fee()
+		}
+
+		fn get_disputes_by_reporter(reporter: AccountId) -> Vec<DisputeId> {
+			Tellor::get_disputes_by_reporter(reporter)
+		}
+
+		fn get_dispute_info(dispute_id: DisputeId) -> Option<(QueryId, Moment, Value, AccountId)> {
+			Tellor::get_dispute_info(dispute_id)
+		}
+
+		fn get_open_disputes_on_id(query_id: QueryId) -> u128 {
+			Tellor::get_open_disputes_on_id(query_id)
+		}
+
+		fn get_vote_count() -> VoteCount {
+			Tellor::get_vote_count()
+		}
+
+		fn get_vote_info(dispute_id: DisputeId) -> Option<(VoteId,VoteInfo<Amount,BlockNumber, Moment>,bool,Option<VoteResult>,AccountId)> {
+			Tellor::get_vote_info(dispute_id).map(|v| (v.identifier,
+			VoteInfo{
+					vote_round: v.vote_round,
+					start_date: v.start_date,
+					block_number: v.block_number,
+					fee: v.fee,
+					tally_date: v.tally_date,
+					users_does_support: v.users.does_support,
+					users_against: v.users.against,
+					users_invalid_query: v.users.invalid_query,
+					reporters_does_support: v.reporters.does_support,
+					reporters_against: v.reporters.against,
+					reporters_invalid_query: v.reporters.invalid_query,
+				},
+			v.executed,
+			v.result,
+			v.initiator))
+		}
+
+		fn get_vote_rounds(vote_id: VoteId) -> Vec<DisputeId>{
+			Tellor::get_vote_rounds(vote_id)
+		}
+
+		fn get_vote_tally_by_address(voter: AccountId) -> u128 {
+			Tellor::get_vote_tally_by_address(voter)
 		}
 	}
 

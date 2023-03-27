@@ -1,30 +1,48 @@
 use super::{
 	AccountId, Balances, ParachainInfo, ParachainSystem, PolkadotXcm, Runtime, RuntimeCall,
-	RuntimeEvent, RuntimeOrigin, WeightToFee, XcmpQueue,
+	RuntimeEvent, RuntimeOrigin, TellorPalletId, WeightToFee, XcmpQueue,
 };
 use core::marker::PhantomData;
 use frame_support::{
-	log, match_types, parameter_types,
-	traits::{Everything, Nothing},
+	ensure, log, match_types, parameter_types,
+	traits::{Contains, Everything, Nothing},
 };
 use pallet_xcm::XcmPassthrough;
 use polkadot_parachain::primitives::Sibling;
 use polkadot_runtime_common::impls::ToAuthor;
-use xcm::latest::{prelude::*, Weight as XCMWeight};
+use sp_runtime::traits::AccountIdConversion;
+use tellor::ContractLocation;
+use xcm::latest::{
+	prelude::{BuyExecution, DescendOrigin, WithdrawAsset, *},
+	MultiLocation, Weight as XCMWeight,
+	WeightLimit::{Limited, Unlimited},
+	Xcm,
+};
 use xcm_builder::{
-	AccountId32Aliases, AllowTopLevelPaidExecutionFrom, AllowUnpaidExecutionFrom, CurrencyAdapter,
-	EnsureXcmOrigin, FixedWeightBounds, IsConcrete, LocationInverter, NativeAsset, ParentIsPreset,
+	AccountId32Aliases, AllowKnownQueryResponses, AllowSubscriptionsFrom,
+	AllowTopLevelPaidExecutionFrom, AllowUnpaidExecutionFrom, CurrencyAdapter, EnsureXcmOrigin,
+	FixedWeightBounds, IsConcrete, LocationInverter, NativeAsset, ParentIsPreset,
 	RelayChainAsNative, SiblingParachainAsNative, SiblingParachainConvertsVia,
 	SignedAccountId32AsNative, SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit,
 	UsingComponents,
 };
 use xcm_executor::{traits::ShouldExecute, XcmExecutor};
 
+const MOONBASE: u32 = 2000;
+
 parameter_types! {
 	pub const RelayLocation: MultiLocation = MultiLocation::parent();
 	pub const RelayNetwork: NetworkId = NetworkId::Any;
+	pub SelfReserve: MultiLocation = MultiLocation { parents:0, interior: Here };
 	pub RelayChainOrigin: RuntimeOrigin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub Ancestry: MultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
+	// Tellor
+	pub TellorRegistry: ContractLocation = (MOONBASE, [192,30,231,241,14,164,175,70,115,207,255,98,113,14,29,119,146,171,168,243]).into();
+	pub TellorGovernance: ContractLocation = (MOONBASE, [62,214,33,55,197,219,146,124,177,55,194,100,85,150,145,22,191,12,35,203]).into();
+	pub TellorGovernanceOrigin: RuntimeOrigin = tellor::Origin::Governance.into();
+	pub TellorStaking: ContractLocation = (MOONBASE, [151,9,81,161,47,151,94,103,98,72,42,202,129,229,125,90,42,78,115,244]).into();
+	pub TellorStakingOrigin: RuntimeOrigin = tellor::Origin::Staking.into();
+	pub TellorPalletAccount: AccountId = TellorPalletId::get().into_account_truncating();
 }
 
 /// Type for specifying how a `MultiLocation` can be converted into an `AccountId`. This is used
@@ -37,6 +55,9 @@ pub type LocationToAccountId = (
 	SiblingParachainConvertsVia<Sibling, AccountId>,
 	// Straight up local `AccountId32` origins just alias directly to `AccountId`.
 	AccountId32Aliases<RelayNetwork, AccountId>,
+	// Map Tellor controller contract locations to Tellor pallet account
+	tellor::LocationToAccount<TellorGovernance, TellorPalletAccount, AccountId>,
+	tellor::LocationToAccount<TellorStaking, TellorPalletAccount, AccountId>,
 );
 
 /// Means for transacting assets on this chain.
@@ -44,7 +65,7 @@ pub type LocalAssetTransactor = CurrencyAdapter<
 	// Use this currency:
 	Balances,
 	// Use this currency when it is a fungible asset matching the given location or name:
-	IsConcrete<RelayLocation>,
+	IsConcrete<SelfReserve>,
 	// Do a simple punn to convert an AccountId32 MultiLocation into a native chain account ID:
 	LocationToAccountId,
 	// Our chain's account ID type (we can't get away without mentioning it explicitly):
@@ -57,6 +78,10 @@ pub type LocalAssetTransactor = CurrencyAdapter<
 /// ready for dispatching a transaction with Xcm's `Transact`. There is an `OriginKind` which can
 /// biases the kind of local `Origin` it will become.
 pub type XcmOriginToTransactDispatchOrigin = (
+	// Tellor controller contract location converter: converts origin of Tellor controller contracts
+	// on relevant smart contract parachain to corresponding Tellor pallet origin
+	tellor::LocationToOrigin<TellorGovernance, TellorGovernanceOrigin, RuntimeOrigin>,
+	tellor::LocationToOrigin<TellorStaking, TellorStakingOrigin, RuntimeOrigin>,
 	// Sovereign account converter; this attempts to derive an `AccountId` from the origin location
 	// using `LocationToAccountId` and then turn that into the usual `Signed` origin. Useful for
 	// foreign chains who want to have a local sovereign account on this chain which they control.
@@ -152,13 +177,25 @@ impl ShouldExecute for DenyReserveTransferToRelayChain {
 	}
 }
 
+match_types! {
+	pub type Moonbeam: impl Contains<MultiLocation> = {
+		MultiLocation { parents: 1, interior: X1(Parachain(MOONBASE)) }
+	};
+}
+
 pub type Barrier = DenyThenTry<
 	DenyReserveTransferToRelayChain,
 	(
 		TakeWeightCredit,
+		// Taken from moonbeam
+		AllowTopLevelPaidExecutionDescendOriginFirst<Moonbeam>,
 		AllowTopLevelPaidExecutionFrom<Everything>,
+		// Parent and its exec plurality get free execution
 		AllowUnpaidExecutionFrom<ParentOrParentsExecutivePlurality>,
-		// ^^^ Parent and its exec plurality get free execution
+		// Expected responses are OK.
+		AllowKnownQueryResponses<PolkadotXcm>,
+		// Subscriptions for version tracking are OK.
+		AllowSubscriptionsFrom<Everything>,
 	),
 >;
 
@@ -174,8 +211,7 @@ impl xcm_executor::Config for XcmConfig {
 	type LocationInverter = LocationInverter<Ancestry>;
 	type Barrier = Barrier;
 	type Weigher = FixedWeightBounds<UnitWeightCost, RuntimeCall, MaxInstructions>;
-	type Trader =
-		UsingComponents<WeightToFee, RelayLocation, AccountId, Balances, ToAuthor<Runtime>>;
+	type Trader = UsingComponents<WeightToFee, SelfReserve, AccountId, Balances, ToAuthor<Runtime>>;
 	type ResponseHandler = PolkadotXcm;
 	type AssetTrap = PolkadotXcm;
 	type AssetClaims = PolkadotXcm;
@@ -218,4 +254,48 @@ impl pallet_xcm::Config for Runtime {
 impl cumulus_pallet_xcm::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type XcmExecutor = XcmExecutor<XcmConfig>;
+}
+
+// NOTE: taken from moonbeam's xcm_primitives::barriers::AllowTopLevelPaidExecutionDescendOriginFirst
+/// Barrier allowing a top level paid message with DescendOrigin instruction first
+pub struct AllowTopLevelPaidExecutionDescendOriginFirst<T>(PhantomData<T>);
+impl<T: Contains<MultiLocation>> ShouldExecute for AllowTopLevelPaidExecutionDescendOriginFirst<T> {
+	fn should_execute<Call>(
+		origin: &MultiLocation,
+		message: &mut Xcm<Call>,
+		max_weight: u64,
+		_weight_credit: &mut u64,
+	) -> Result<(), ()> {
+		log::trace!(
+			target: "xcm::barriers",
+			"AllowTopLevelPaidExecutionDescendOriginFirst origin:
+			{:?}, message: {:?}, max_weight: {:?}, weight_credit: {:?}",
+			origin, message, max_weight, _weight_credit,
+		);
+		ensure!(T::contains(origin), ());
+		let mut iter = message.0.iter_mut();
+		// Make sure the first instruction is DescendOrigin
+		iter.next()
+			.filter(|instruction| matches!(instruction, DescendOrigin(_)))
+			.ok_or(())?;
+
+		// Then WithdrawAsset
+		iter.next()
+			.filter(|instruction| matches!(instruction, WithdrawAsset(_)))
+			.ok_or(())?;
+
+		// Then BuyExecution
+		let i = iter.next().ok_or(())?;
+		match i {
+			BuyExecution { weight_limit: Limited(ref mut weight), .. } if *weight >= max_weight => {
+				*weight = max_weight;
+				Ok(())
+			},
+			BuyExecution { ref mut weight_limit, .. } if weight_limit == &Unlimited => {
+				*weight_limit = Limited(max_weight);
+				Ok(())
+			},
+			_ => Err(()),
+		}
+	}
 }

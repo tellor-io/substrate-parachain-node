@@ -6236,7 +6236,7 @@ dependencies = [
  "substrate-wasm-builder",
  "tellor",
  "tellor-runtime-api",
- "tellor-sample",
+ "using-tellor",
  "xcm",
  "xcm-builder",
  "xcm-executor",
@@ -11086,7 +11086,7 @@ checksum = "8ae9980cab1db3fceee2f6c6f643d5d8de2997c58ee8d25fb0cc8a9e9e7348e5"
 [[package]]
 name = "tellor"
 version = "0.1.0"
-source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor#9d06779efdd0de26cd4aa8f3949a0dd67e6c3604"
+source = "git+https://github.com/tellor-io/tellor-pallet#03e8abd89635f41821c4837730a253c9d0d7e38a"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -11103,25 +11103,11 @@ dependencies = [
 [[package]]
 name = "tellor-runtime-api"
 version = "0.1.0"
-source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor#9d06779efdd0de26cd4aa8f3949a0dd67e6c3604"
+source = "git+https://github.com/tellor-io/tellor-pallet#03e8abd89635f41821c4837730a253c9d0d7e38a"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
  "sp-std",
- "tellor",
-]
-
-[[package]]
-name = "tellor-sample"
-version = "0.1.0"
-source = "git+https://github.com/evilrobot-01/substrate-pallets?branch=tellor-sample#f3d7832e73fdd467833a0e017f9507d46d6a18ac"
-dependencies = [
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "parity-scale-codec",
- "scale-info",
- "sp-arithmetic",
  "tellor",
 ]
 
@@ -11798,6 +11784,20 @@ dependencies = [
  "form_urlencoded",
  "idna 0.3.0",
  "percent-encoding",
+]
+
+[[package]]
+name = "using-tellor"
+version = "0.1.0"
+source = "git+https://github.com/tellor-io/using-tellor-pallet#b09258c595554007357521a1bf2233e5cde4f154"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-arithmetic",
+ "tellor",
 ]
 
 [[package]]

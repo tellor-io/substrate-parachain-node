@@ -479,7 +479,6 @@ impl tellor::Config for Runtime {
 	type ClaimBuffer = ConstU64<{ 12 * HOUR_IN_MILLISECONDS }>;
 	type ClaimPeriod = ConstU64<{ 4 * WEEK_IN_MILLISECONDS }>;
 	type DisputeId = DisputeId;
-	type DisputeRoundReportingPeriod = ConstU64<{ 1 * DAY_IN_MILLISECONDS }>;
 	type Fee = ConstU16<10>; // 1%
 	type Governance = xcm_config::TellorGovernance;
 	type GovernanceOrigin = EnsureGovernance;
@@ -507,6 +506,8 @@ impl tellor::Config for Runtime {
 	type Time = Timestamp;
 	type Token = Balances;
 	type ValueConverter = TellorConfig;
+	type VoteRoundPeriod = ConstU64<{ 1 * DAY_IN_MILLISECONDS }>;
+	type VoteTallyDisputePeriod = ConstU64<{ 1 * DAY_IN_MILLISECONDS }>;
 	type WithdrawalPeriod = ConstU64<{ 7 * DAY_IN_MILLISECONDS }>;
 	type Xcm = TellorConfig;
 }
@@ -534,8 +535,8 @@ impl Get<u32> for ParachainId {
 	}
 }
 
-/// Configure the tellor-sample pallet
-impl tellor_sample::Config for Runtime {
+/// Configure the using-tellor sample pallet
+impl using_tellor::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type ConfigureOrigin = EnsureRoot<AccountId>;
 	type Price = Price;
@@ -582,7 +583,7 @@ construct_runtime!(
 
 		// Tellor
 		Tellor: tellor::{Pallet, Call, Storage, Event<T>, Origin}  = 40,
-		TellorSample: tellor_sample::{Pallet, Call, Storage, Event<T>}  = 41,
+		UsingTellor: using_tellor::{Pallet, Call, Storage, Event<T>}  = 41,
 	}
 );
 
@@ -891,7 +892,7 @@ impl_runtime_apis! {
 
 	// Tellor Governance Api
 	impl tellor_runtime_api::TellorGovernance<Block, AccountId, Amount, BlockNumber, DisputeId, QueryId, Moment, Value, VoteCount, VoteId> for Runtime {
-		fn did_vote(dispute_id: DisputeId, voter: AccountId) -> Option<bool>{
+		fn did_vote(dispute_id: DisputeId, voter: AccountId) -> bool{
 			Tellor::did_vote(dispute_id, voter)
 		}
 

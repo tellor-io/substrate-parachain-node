@@ -12,12 +12,14 @@ pub mod xcm_config;
 use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
-use sp_core::{bounded::BoundedVec, crypto::KeyTypeId, ConstU16, Get, OpaqueMetadata, H256};
+use sp_core::{
+	bounded::BoundedVec, crypto::KeyTypeId, ConstU128, ConstU16, Get, OpaqueMetadata, H256,
+};
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
 	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, Convert, IdentifyAccount, Verify},
 	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, MultiSignature,
+	ApplyExtrinsicResult, DispatchError, MultiSignature,
 };
 
 use sp_std::prelude::*;
@@ -58,7 +60,8 @@ use xcm_executor::XcmExecutor;
 
 /// Import the tellor pallet.
 use tellor::{
-	DisputeId, EnsureGovernance, EnsureStaking, FeedDetails, FeedId, QueryId, Tip, VoteResult,
+	DisputeId, EnsureGovernance, EnsureStaking, FeedDetails, FeedId, QueryId, Tip, Tributes,
+	VoteResult,
 };
 use tellor_runtime_api::{FeedDetailsWithQueryData, SingleTipWithQueryData, VoteInfo};
 
@@ -461,9 +464,12 @@ impl pallet_sudo::Config for Runtime {
 	type RuntimeCall = RuntimeCall;
 }
 
-type Price = u32;
+type Price = u128;
 
 parameter_types! {
+	pub const MinimumStakeAmount: u128 = 100 * 10u128.pow(18); // 100 TRB
+	// https://github.com/tellor-io/dataSpecs/blob/main/types/SpotPrice.md#trbusd-spot-price
+	pub StakingTokenPriceQueryId: H256 = H256([92,19,205,156,151,219,185,143,36,41,193,1,162,168,21,14,108,122,13,218,255,97,36,238,23,106,58,65,16,103,222,208]);
 	pub const TellorPalletId: PalletId = PalletId(*b"py/tellr");
 }
 
@@ -471,7 +477,9 @@ parameter_types! {
 impl tellor::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeOrigin = RuntimeOrigin;
-	type Amount = Balance;
+	type Balance = Balance;
+	type ConfigureOrigin = EnsureRoot<AccountId>;
+	type Decimals = ConstU8<12>;
 	type Fee = ConstU16<10>; // 1%
 	type Governance = xcm_config::TellorGovernance;
 	type GovernanceOrigin = EnsureGovernance;
@@ -484,24 +492,32 @@ impl tellor::Config for Runtime {
 	type MaxTimestamps = ConstU32<{ u32::MAX }>;
 	type MaxTipsPerQuery = ConstU32<10>;
 	type MaxValueLength = ConstU32<256>;
-	type MaxVotes = ();
+	type MaxVotes = ConstU32<10>;
+	type MinimumStakeAmount = MinimumStakeAmount;
 	type PalletId = TellorPalletId;
 	type ParachainId = ParachainId;
 	type Price = Price;
-	type RegistrationOrigin = EnsureRoot<AccountId>;
+	type RegisterOrigin = EnsureRoot<AccountId>;
 	type Registry = xcm_config::TellorRegistry;
+	type StakeAmountCurrencyTarget = ConstU128<{ 500 * 10u128.pow(18) }>;
 	type Staking = xcm_config::TellorStaking;
 	type StakingOrigin = EnsureStaking;
+	type StakingTokenPriceQueryId = StakingTokenPriceQueryId;
 	type Time = Timestamp;
 	type Token = Balances;
+	type UpdateStakeAmountInterval = ConstU64<{ 12 * tellor::HOURS }>;
 	type ValueConverter = TellorConfig;
 	type Xcm = TellorConfig;
 }
 
 pub struct TellorConfig;
-impl Convert<Vec<u8>, Option<u32>> for TellorConfig {
-	fn convert(_a: Vec<u8>) -> Option<u32> {
-		todo!()
+impl Convert<Vec<u8>, Result<u128, DispatchError>> for TellorConfig {
+	fn convert(a: Vec<u8>) -> Result<u128, DispatchError> {
+		// Should be more advanced depending on chain config
+		match a[16..].try_into() {
+			Ok(v) => Ok(u128::from_be_bytes(v)),
+			Err(_) => Err(tellor::Error::ValueConversionError::<Runtime>.into()),
+		}
 	}
 }
 impl tellor::SendXcm for TellorConfig {
@@ -527,7 +543,7 @@ impl using_tellor::Config for Runtime {
 	type ConfigureOrigin = EnsureRoot<AccountId>;
 	type Price = Price;
 	type Tellor = Tellor;
-	type Value = u32;
+	type Value = u128;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -586,8 +602,7 @@ mod benches {
 	);
 }
 
-type Amount = <Runtime as tellor::Config>::Amount;
-type StakeInfo = tellor::StakeInfo<Amount, <Runtime as tellor::Config>::MaxQueriesPerReporter>;
+type StakeInfo = tellor::StakeInfo<Balance, <Runtime as tellor::Config>::MaxQueriesPerReporter>;
 type Value = BoundedVec<u8, <Runtime as tellor::Config>::MaxValueLength>;
 
 impl_runtime_apis! {
@@ -715,20 +730,20 @@ impl_runtime_apis! {
 	}
 
 	// Tellor AutoPay API
-	impl tellor_runtime_api::TellorAutoPay<Block, AccountId, Amount> for Runtime {
+	impl tellor_runtime_api::TellorAutoPay<Block, AccountId, Balance> for Runtime {
 		fn get_current_feeds(query_id: QueryId) -> Vec<FeedId>{
 			Tellor::get_current_feeds(query_id)
 		}
 
-		fn get_current_tip(query_id: QueryId) -> Amount {
+		fn get_current_tip(query_id: QueryId) -> Balance {
 			Tellor::get_current_tip(query_id)
 		}
 
-		fn get_data_feed(feed_id: FeedId) -> Option<FeedDetails<Amount>> {
+		fn get_data_feed(feed_id: FeedId) -> Option<FeedDetails<Balance>> {
 			Tellor::get_data_feed(feed_id)
 		}
 
-		fn get_funded_feed_details() -> Vec<FeedDetailsWithQueryData<Amount>> {
+		fn get_funded_feed_details() -> Vec<FeedDetailsWithQueryData<Balance>> {
 			Tellor::get_funded_feed_details().into_iter()
 			.map(|(details, query_data)| FeedDetailsWithQueryData {
 				details: details,
@@ -744,7 +759,7 @@ impl_runtime_apis! {
 			Tellor::get_funded_query_ids()
 		}
 
-		fn get_funded_single_tips_info() -> Vec<SingleTipWithQueryData<Amount>> {
+		fn get_funded_single_tips_info() -> Vec<SingleTipWithQueryData<Balance>> {
 			Tellor::get_funded_single_tips_info().into_iter()
 			.map(|( query_data, tip)| SingleTipWithQueryData {
 				query_data: query_data.to_vec(),
@@ -757,11 +772,11 @@ impl_runtime_apis! {
 			Tellor::get_past_tip_count(query_id)
 		}
 
-		fn get_past_tips(query_id: QueryId) -> Vec<Tip<Amount>> {
+		fn get_past_tips(query_id: QueryId) -> Vec<Tip<Balance>> {
 			Tellor::get_past_tips(query_id)
 		}
 
-		fn get_past_tip_by_index(query_id: QueryId, index: u32) -> Option<Tip<Amount>>{
+		fn get_past_tip_by_index(query_id: QueryId, index: u32) -> Option<Tip<Balance>>{
 			Tellor::get_past_tip_by_index(query_id, index)
 		}
 
@@ -769,7 +784,7 @@ impl_runtime_apis! {
 			Tellor::get_query_id_from_feed_id(feed_id)
 		}
 
-		fn get_reward_amount(feed_id: FeedId, query_id: QueryId, timestamps: Vec<tellor::Timestamp>) -> Amount{
+		fn get_reward_amount(feed_id: FeedId, query_id: QueryId, timestamps: Vec<tellor::Timestamp>) -> Balance{
 			Tellor::get_reward_amount(feed_id, query_id, timestamps)
 		}
 
@@ -781,13 +796,13 @@ impl_runtime_apis! {
 			Tellor::get_reward_claim_status_list(feed_id, query_id, timestamps)
 		}
 
-		fn get_tips_by_address(user: AccountId) -> Amount {
+		fn get_tips_by_address(user: AccountId) -> Balance {
 			Tellor::get_tips_by_address(&user)
 		}
 	}
 
 	// Tellor Oracle Api
-	impl tellor_runtime_api::TellorOracle<Block, AccountId, Amount, BlockNumber, StakeInfo, Value> for Runtime {
+	impl tellor_runtime_api::TellorOracle<Block, AccountId, BlockNumber, StakeInfo, Value> for Runtime {
 		fn get_block_number_by_timestamp(query_id: QueryId, timestamp: tellor::Timestamp) -> Option<BlockNumber> {
 			Tellor::get_block_number_by_timestamp(query_id, timestamp)
 		}
@@ -828,7 +843,7 @@ impl_runtime_apis! {
 			Tellor::get_reports_submitted_by_address_and_query_id(reporter, query_id)
 		}
 
-		fn get_stake_amount() -> Amount {
+		fn get_stake_amount() -> Tributes {
 			Tellor::get_stake_amount()
 		}
 
@@ -852,7 +867,7 @@ impl_runtime_apis! {
 			Tellor::get_timestamp_index_by_timestamp(query_id, timestamp)
 		}
 
-		fn get_total_stake_amount() -> Amount {
+		fn get_total_stake_amount() -> Tributes {
 			Tellor::get_total_stake_amount()
 		}
 
@@ -870,12 +885,12 @@ impl_runtime_apis! {
 	}
 
 	// Tellor Governance Api
-	impl tellor_runtime_api::TellorGovernance<Block, AccountId, Amount, BlockNumber, Value> for Runtime {
+	impl tellor_runtime_api::TellorGovernance<Block, AccountId, Balance, BlockNumber, Value> for Runtime {
 		fn did_vote(dispute_id: DisputeId, vote_round: u8, voter: AccountId) -> bool{
 			Tellor::did_vote(dispute_id, vote_round, voter)
 		}
 
-		fn get_dispute_fee() -> Amount {
+		fn get_dispute_fee() -> Option<Balance> {
 			Tellor::get_dispute_fee()
 		}
 
@@ -895,7 +910,7 @@ impl_runtime_apis! {
 			Tellor::get_vote_count()
 		}
 
-		fn get_vote_info(dispute_id: DisputeId, vote_round: u8) -> Option<(VoteInfo<Amount,BlockNumber, tellor::Timestamp>,bool,Option<VoteResult>,AccountId)> {
+		fn get_vote_info(dispute_id: DisputeId, vote_round: u8) -> Option<(VoteInfo<Balance,BlockNumber, tellor::Timestamp>,bool,Option<VoteResult>,AccountId)> {
 			Tellor::get_vote_info(dispute_id, vote_round).map(|v| (
 			VoteInfo{
 					vote_round: v.vote_round,
@@ -920,7 +935,7 @@ impl_runtime_apis! {
 		}
 
 		fn get_vote_tally_by_address(voter: AccountId) -> u128 {
-			Tellor::get_vote_tally_by_address(voter)
+			Tellor::get_vote_tally_by_address(&voter)
 		}
 	}
 

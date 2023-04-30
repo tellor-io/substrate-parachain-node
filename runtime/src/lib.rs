@@ -17,9 +17,9 @@ use sp_core::{
 };
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
-	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, Convert, IdentifyAccount, Verify},
+	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, Verify},
 	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, DispatchError, MultiSignature,
+	ApplyExtrinsicResult, MultiSignature,
 };
 
 use sp_std::prelude::*;
@@ -44,6 +44,7 @@ use frame_system::{
 };
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 pub use sp_runtime::{MultiAddress, Perbill, Permill};
+use xcm::latest::prelude::*;
 use xcm_config::{XcmConfig, XcmOriginToTransactDispatchOrigin};
 
 #[cfg(any(feature = "std", test))]
@@ -464,25 +465,30 @@ impl pallet_sudo::Config for Runtime {
 	type RuntimeCall = RuntimeCall;
 }
 
-type Price = u128;
-
 parameter_types! {
 	pub const MinimumStakeAmount: u128 = 100 * 10u128.pow(18); // 100 TRB
 	// https://github.com/tellor-io/dataSpecs/blob/main/types/SpotPrice.md#trbusd-spot-price
 	pub StakingTokenPriceQueryId: H256 = H256([92,19,205,156,151,219,185,143,36,41,193,1,162,168,21,14,108,122,13,218,255,97,36,238,23,106,58,65,16,103,222,208]);
+	pub StakingToLocalTokenPriceQueryId: H256 = H256([252, 212, 53, 69, 139, 47, 79, 224, 14, 207, 98, 192, 81, 195, 123, 170, 138, 241, 23, 4, 53, 70, 22, 191, 191, 171, 11, 101, 130, 16, 61, 30]);
 	pub const TellorPalletId: PalletId = PalletId(*b"py/tellr");
+	pub XcmFeesAsset : AssetId = AssetId::Concrete(PalletInstance(3).into()); // 'Self-Reserve' on EVM parachain (aka Balances pallet)
+	pub FeeLocation : Junctions = Junctions::Here; // Native currency on this parachain
 }
+
+const DECIMALS: u8 = 12;
 
 /// Configure the tellor pallet
 impl tellor::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeOrigin = RuntimeOrigin;
+	type Asset = Balances;
 	type Balance = Balance;
-	type ConfigureOrigin = EnsureRoot<AccountId>;
-	type Decimals = ConstU8<12>;
+	type Decimals = ConstU8<DECIMALS>;
 	type Fee = ConstU16<10>; // 1%
+	type FeeLocation = FeeLocation;
 	type Governance = xcm_config::TellorGovernance;
 	type GovernanceOrigin = EnsureGovernance;
+	type InitialDisputeFee = ConstU128<{ (100 / 10) * (5 * 10u128.pow(DECIMALS as u32)) }>; // (100 TRB / 10) * 5, where TRB 1:5 OCP
 	type MaxClaimTimestamps = ConstU32<10>;
 	type MaxFeedsPerQuery = ConstU32<10>;
 	type MaxFundedFeeds = ConstU32<10>;
@@ -496,30 +502,22 @@ impl tellor::Config for Runtime {
 	type MinimumStakeAmount = MinimumStakeAmount;
 	type PalletId = TellorPalletId;
 	type ParachainId = ParachainId;
-	type Price = Price;
 	type RegisterOrigin = EnsureRoot<AccountId>;
 	type Registry = xcm_config::TellorRegistry;
 	type StakeAmountCurrencyTarget = ConstU128<{ 500 * 10u128.pow(18) }>;
 	type Staking = xcm_config::TellorStaking;
 	type StakingOrigin = EnsureStaking;
 	type StakingTokenPriceQueryId = StakingTokenPriceQueryId;
+	type StakingToLocalTokenPriceQueryId = StakingToLocalTokenPriceQueryId;
 	type Time = Timestamp;
-	type Token = Balances;
 	type UpdateStakeAmountInterval = ConstU64<{ 12 * tellor::HOURS }>;
-	type ValueConverter = TellorConfig;
+	type WeightToFee = ConstU128<10_000>;
 	type Xcm = TellorConfig;
+	type XcmFeesAsset = XcmFeesAsset;
+	type XcmWeightToAsset = ConstU128<50_000>; // Moonbase Alpha: https://github.com/PureStake/moonbeam/blob/f19ba9de013a1c789425d3b71e8a92d54f2191af/runtime/moonbase/src/lib.rs#L135
 }
 
 pub struct TellorConfig;
-impl Convert<Vec<u8>, Result<u128, DispatchError>> for TellorConfig {
-	fn convert(a: Vec<u8>) -> Result<u128, DispatchError> {
-		// Should be more advanced depending on chain config
-		match a[16..].try_into() {
-			Ok(v) => Ok(u128::from_be_bytes(v)),
-			Err(_) => Err(tellor::Error::ValueConversionError::<Runtime>.into()),
-		}
-	}
-}
 impl tellor::SendXcm for TellorConfig {
 	fn send_xcm(
 		interior: impl Into<Junctions>,
@@ -541,9 +539,7 @@ impl Get<u32> for ParachainId {
 impl using_tellor::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type ConfigureOrigin = EnsureRoot<AccountId>;
-	type Price = Price;
 	type Tellor = Tellor;
-	type Value = u128;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -890,7 +886,7 @@ impl_runtime_apis! {
 			Tellor::did_vote(dispute_id, vote_round, voter)
 		}
 
-		fn get_dispute_fee() -> Option<Balance> {
+		fn get_dispute_fee() -> Balance {
 			Tellor::get_dispute_fee()
 		}
 

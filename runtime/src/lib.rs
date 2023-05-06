@@ -61,8 +61,7 @@ use xcm_executor::XcmExecutor;
 
 /// Import the tellor pallet.
 use tellor::{
-	DisputeId, EnsureGovernance, EnsureStaking, FeedDetails, FeedId, QueryId, Tip, Tributes,
-	VoteResult,
+	DisputeId, EnsureGovernance, EnsureStaking, Feed, FeedId, QueryId, Tip, Tributes, VoteResult,
 };
 use tellor_runtime_api::{FeedDetailsWithQueryData, SingleTipWithQueryData, VoteInfo};
 
@@ -490,15 +489,11 @@ impl tellor::Config for Runtime {
 	type GovernanceOrigin = EnsureGovernance;
 	type InitialDisputeFee = ConstU128<{ (100 / 10) * (5 * 10u128.pow(DECIMALS as u32)) }>; // (100 TRB / 10) * 5, where TRB 1:5 OCP
 	type MaxClaimTimestamps = ConstU32<10>;
-	type MaxFeedsPerQuery = ConstU32<10>;
+	type MaxDisputeVotes = ConstU32<10>;
 	type MaxFundedFeeds = ConstU32<10>;
-	type MaxQueriesPerReporter = ConstU32<10>;
 	type MaxQueryDataLength = ConstU32<512>;
-	type MaxRewardClaims = ConstU32<10>;
-	type MaxTimestamps = ConstU32<{ u32::MAX }>;
 	type MaxTipsPerQuery = ConstU32<10>;
 	type MaxValueLength = ConstU32<256>;
-	type MaxVotes = ConstU32<10>;
 	type MinimumStakeAmount = MinimumStakeAmount;
 	type PalletId = TellorPalletId;
 	type ParachainId = ParachainId;
@@ -598,7 +593,7 @@ mod benches {
 	);
 }
 
-type StakeInfo = tellor::StakeInfo<Balance, <Runtime as tellor::Config>::MaxQueriesPerReporter>;
+type StakeInfo = tellor::StakeInfo<Balance>;
 type Value = BoundedVec<u8, <Runtime as tellor::Config>::MaxValueLength>;
 
 impl_runtime_apis! {
@@ -735,7 +730,7 @@ impl_runtime_apis! {
 			Tellor::get_current_tip(query_id)
 		}
 
-		fn get_data_feed(feed_id: FeedId) -> Option<FeedDetails<Balance>> {
+		fn get_data_feed(feed_id: FeedId) -> Option<Feed<Balance>> {
 			Tellor::get_data_feed(feed_id)
 		}
 
@@ -784,7 +779,7 @@ impl_runtime_apis! {
 			Tellor::get_reward_amount(feed_id, query_id, timestamps)
 		}
 
-		fn get_reward_claimed_status(feed_id: FeedId, query_id: QueryId, timestamp: tellor::Timestamp) -> Option<bool>{
+		fn get_reward_claimed_status(feed_id: FeedId, query_id: QueryId, timestamp: tellor::Timestamp) -> bool{
 			Tellor::get_reward_claimed_status(feed_id, query_id, timestamp)
 		}
 
@@ -852,11 +847,11 @@ impl_runtime_apis! {
 		}
 
 		fn get_timestamp_by_query_id_and_index(query_id: QueryId, index: u32) -> Option<tellor::Timestamp>{
-			Tellor::get_timestamp_by_query_id_and_index(query_id, index as usize)
+			Tellor::get_timestamp_by_query_id_and_index(query_id, index)
 		}
 
 		fn get_index_for_data_before(query_id: QueryId, timestamp: tellor::Timestamp) -> Option<u32> {
-			Tellor::get_index_for_data_before(query_id, timestamp).map(|index| index as u32)
+			Tellor::get_index_for_data_before(query_id, timestamp)
 		}
 
 		fn get_timestamp_index_by_timestamp(query_id: QueryId, timestamp: tellor::Timestamp) -> Option<u32> {

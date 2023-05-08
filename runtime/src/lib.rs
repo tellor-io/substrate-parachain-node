@@ -485,11 +485,11 @@ impl tellor::Config for Runtime {
 	type GovernanceOrigin = EnsureGovernance;
 	type InitialDisputeFee = ConstU128<{ (100 / 10) * (5 * 10u128.pow(DECIMALS as u32)) }>; // (100 TRB / 10) * 5, where TRB 1:5 OCP
 	type MaxClaimTimestamps = ConstU32<10>;
-	type MaxDisputeVotes = ConstU32<10>;
 	type MaxFundedFeeds = ConstU32<10>;
 	type MaxQueryDataLength = ConstU32<512>;
 	type MaxTipsPerQuery = ConstU32<10>;
 	type MaxValueLength = ConstU32<256>;
+	type MaxVotes = ConstU32<10>;
 	type MinimumStakeAmount = MinimumStakeAmount;
 	type PalletId = TellorPalletId;
 	type ParachainId = ParachainId;

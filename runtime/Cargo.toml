@@ -70,7 +70,7 @@ cumulus-primitives-utility = { git = "https://github.com/paritytech/cumulus.git"
 pallet-collator-selection = { git = "https://github.com/paritytech/cumulus.git", branch = "polkadot-v0.9.40", default-features = false }
 parachain-info = { git = "https://github.com/paritytech/cumulus.git", branch = "polkadot-v0.9.40", default-features = false }
 
-# Tellor
+# TELLOR: add tellor components
 tellor = { git = "https://github.com/tellor-io/tellor-pallet", default-features = false }
 tellor-runtime-api = { git = "https://github.com/tellor-io/tellor-pallet", default-features = false }
 using-tellor = { git = "https://github.com/tellor-io/using-tellor-pallet", default-features = false }

@@ -23,15 +23,17 @@ use xcm_builder::{
 };
 use xcm_executor::{traits::ShouldExecute, XcmExecutor};
 
+// TELLOR: define EVM smart contract parachain identifier
 const MOONBASE: u32 = 2000;
 
 parameter_types! {
 	pub const RelayLocation: MultiLocation = MultiLocation::parent();
 	pub const RelayNetwork: Option<NetworkId> = None;
+	// TELLOR: add self reserve for fee payment
 	pub SelfReserve: MultiLocation = MultiLocation { parents:0, interior: Here };
 	pub RelayChainOrigin: RuntimeOrigin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub UniversalLocation: InteriorMultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
-	// Tellor
+	// TELLOR: define contract locations on evm smart contract parachain, along with origins
 	pub TellorRegistry: ContractLocation = (MOONBASE, [192,30,231,241,14,164,175,70,115,207,255,98,113,14,29,119,146,171,168,243]).into();
 	pub TellorGovernance: ContractLocation = (MOONBASE, [62,214,33,55,197,219,146,124,177,55,194,100,85,150,145,22,191,12,35,203]).into();
 	pub TellorGovernanceOrigin: RuntimeOrigin = tellor::Origin::Governance.into();
@@ -50,7 +52,7 @@ pub type LocationToAccountId = (
 	SiblingParachainConvertsVia<Sibling, AccountId>,
 	// Straight up local `AccountId32` origins just alias directly to `AccountId`.
 	AccountId32Aliases<RelayNetwork, AccountId>,
-	// Map Tellor controller contract locations to Tellor pallet account
+	// TELLOR: simply map controller contract locations to Tellor pallet account for fee payment
 	tellor::LocationToAccount<TellorGovernance, TellorPalletAccount, AccountId>,
 	tellor::LocationToAccount<TellorStaking, TellorPalletAccount, AccountId>,
 );
@@ -60,6 +62,7 @@ pub type LocalAssetTransactor = CurrencyAdapter<
 	// Use this currency:
 	Balances,
 	// Use this currency when it is a fungible asset matching the given location or name:
+	// TELLOR: use self reserve instead of relay location
 	IsConcrete<SelfReserve>,
 	// Do a simple punn to convert an AccountId32 MultiLocation into a native chain account ID:
 	LocationToAccountId,
@@ -73,8 +76,8 @@ pub type LocalAssetTransactor = CurrencyAdapter<
 /// ready for dispatching a transaction with Xcm's `Transact`. There is an `OriginKind` which can
 /// biases the kind of local `Origin` it will become.
 pub type XcmOriginToTransactDispatchOrigin = (
-	// Tellor controller contract location converter: converts origin of Tellor controller contracts
-	// on relevant smart contract parachain to corresponding Tellor pallet origin
+	// TELLOR: convert expected controller contract locations to origins for securing pallet dispatchables
+	// Converts origin of Tellor controller contracts on relevant smart contract parachain to corresponding Tellor pallet origin
 	tellor::LocationToOrigin<TellorGovernance, TellorGovernanceOrigin, RuntimeOrigin>,
 	tellor::LocationToOrigin<TellorStaking, TellorStakingOrigin, RuntimeOrigin>,
 	// Sovereign account converter; this attempts to derive an `AccountId` from the origin location
@@ -96,7 +99,8 @@ pub type XcmOriginToTransactDispatchOrigin = (
 
 parameter_types! {
 	// One XCM operation is 1_000_000_000 weight - almost certainly a conservative estimate.
-	pub UnitWeightCost: Weight = Weight::from_parts(1_000_000_000, 16 * 1024);
+	// TELLOR: reduce proof_size unit cost to value which works within Moonbeams DEFAULT_PROOF_SIZE value constraint
+	pub UnitWeightCost: Weight = Weight::from_parts(1_000_000_000, 25 * 1024);
 	pub const MaxInstructions: u32 = 100;
 	pub const MaxAssetsIntoHolding: u32 = 64;
 }
@@ -176,6 +180,7 @@ impl ShouldExecute for DenyReserveTransferToRelayChain {
 	}
 }
 
+// TELLOR: define evm smart contract parachain multilocation
 match_types! {
 	pub type Moonbeam: impl Contains<MultiLocation> = {
 		MultiLocation { parents: 1, interior: X1(Parachain(MOONBASE)) }
@@ -188,7 +193,8 @@ pub type Barrier = DenyThenTry<
 		TakeWeightCredit,
 		WithComputedOrigin<
 			(
-				// Taken from moonbeam
+				// TELLOR: allow DescendOrigin, only for moonbeam, required to enable calls from smart contracts
+				// Could be further improved to only accept specific contract addresses
 				AllowTopLevelPaidExecutionDescendOriginFirst<Moonbeam>,
 				AllowTopLevelPaidExecutionFrom<Everything>,
 				AllowExplicitUnpaidExecutionFrom<ParentOrParentsExecutivePlurality>,
@@ -212,6 +218,7 @@ impl xcm_executor::Config for XcmConfig {
 	type UniversalLocation = UniversalLocation;
 	type Barrier = Barrier;
 	type Weigher = FixedWeightBounds<UnitWeightCost, RuntimeCall, MaxInstructions>;
+	// TELLOR: use self reserve for purchasing weight credit
 	type Trader = UsingComponents<WeightToFee, SelfReserve, AccountId, Balances, ToAuthor<Runtime>>;
 	type ResponseHandler = PolkadotXcm;
 	type AssetTrap = PolkadotXcm;
@@ -279,7 +286,7 @@ impl cumulus_pallet_xcm::Config for Runtime {
 	type XcmExecutor = XcmExecutor<XcmConfig>;
 }
 
-// NOTE: taken from moonbeam's xcm_primitives::barriers::AllowTopLevelPaidExecutionDescendOriginFirst
+// TELLOR: add barrier implementation from Moonbeam: taken from moonbeam's xcm_primitives::barriers::AllowTopLevelPaidExecutionDescendOriginFirst
 /// Barrier allowing a top level paid message with DescendOrigin instruction first
 pub struct AllowTopLevelPaidExecutionDescendOriginFirst<T>(PhantomData<T>);
 impl<T: Contains<MultiLocation>> ShouldExecute for AllowTopLevelPaidExecutionDescendOriginFirst<T> {

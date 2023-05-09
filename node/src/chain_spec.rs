@@ -102,7 +102,7 @@ pub fn development_config() -> ChainSpec {
 					get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
 				],
 				1000.into(),
-				// Sudo account
+				// TELLOR: Add Alice as sudo
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
 			)
 		},
@@ -159,7 +159,7 @@ pub fn local_testnet_config() -> ChainSpec {
 					get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
 				],
 				1000.into(),
-				// Sudo account
+				// TELLOR: Add Alice as sudo
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
 			)
 		},
@@ -223,6 +223,7 @@ fn testnet_genesis(
 			safe_xcm_version: Some(SAFE_XCM_VERSION),
 		},
 		transaction_payment: Default::default(),
+		// TELLOR: Add sudo
 		sudo: parachain_template_runtime::SudoConfig {
 			// Assign network admin rights.
 			key: Some(root_key),

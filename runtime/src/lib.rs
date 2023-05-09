@@ -59,7 +59,7 @@ use weights::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight};
 use xcm::latest::prelude::BodyId;
 use xcm_executor::XcmExecutor;
 
-/// Import the tellor pallet.
+/// TELLOR: Import the tellor types
 use tellor::{
 	DisputeId, EnsureGovernance, EnsureStaking, Feed, FeedId, QueryId, Tip, Tributes, VoteResult,
 };
@@ -181,6 +181,7 @@ impl_opaque_keys! {
 
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
+	// TELLOR: set runtime name
 	spec_name: create_runtime_str!("oracle-consumer"),
 	impl_name: create_runtime_str!("oracle-consumer"),
 	authoring_version: 1,
@@ -455,11 +456,13 @@ impl pallet_collator_selection::Config for Runtime {
 	type WeightInfo = ();
 }
 
+// TELLOR: add sudo config
 impl pallet_sudo::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
 }
 
+// TELLOR: add tellor pallet config
 parameter_types! {
 	pub const MinimumStakeAmount: u128 = 100 * 10u128.pow(18); // 100 TRB
 	// https://github.com/tellor-io/dataSpecs/blob/main/types/SpotPrice.md#trbusd-spot-price
@@ -469,10 +472,7 @@ parameter_types! {
 	pub XcmFeesAsset : AssetId = AssetId::Concrete(PalletInstance(3).into()); // 'Self-Reserve' on EVM parachain (aka Balances pallet)
 	pub FeeLocation : Junctions = Junctions::Here; // Native currency on this parachain
 }
-
 const DECIMALS: u8 = 12;
-
-/// Configure the tellor pallet
 impl tellor::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeOrigin = RuntimeOrigin;
@@ -503,13 +503,14 @@ impl tellor::Config for Runtime {
 	type Time = Timestamp;
 	type UpdateStakeAmountInterval = ConstU64<{ 12 * tellor::HOURS }>;
 	type WeightToFee = ConstU128<10_000>;
-	type Xcm = TellorConfig;
+	type Xcm = SendXcm;
 	type XcmFeesAsset = XcmFeesAsset;
 	type XcmWeightToAsset = ConstU128<50_000>; // Moonbase Alpha: https://github.com/PureStake/moonbeam/blob/f19ba9de013a1c789425d3b71e8a92d54f2191af/runtime/moonbase/src/lib.rs#L135
 }
 
-pub struct TellorConfig;
-impl tellor::SendXcm for TellorConfig {
+// TELLOR: implement simple helper to wrap pallet_xcm::send_xcm
+pub struct SendXcm;
+impl tellor::SendXcm for SendXcm {
 	fn send_xcm(
 		interior: impl Into<Junctions>,
 		dest: impl Into<MultiLocation>,
@@ -519,6 +520,7 @@ impl tellor::SendXcm for TellorConfig {
 	}
 }
 
+// TELLOR: implement simple helper to get local parachain id
 pub struct ParachainId;
 impl Get<u32> for ParachainId {
 	fn get() -> u32 {
@@ -526,7 +528,7 @@ impl Get<u32> for ParachainId {
 	}
 }
 
-/// Configure the using-tellor sample pallet
+/// TELLOR: add sample using-tellor pallet
 impl using_tellor::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type ConfigureOrigin = EnsureRoot<AccountId>;
@@ -563,9 +565,10 @@ construct_runtime!(
 		CumulusXcm: cumulus_pallet_xcm = 32,
 		DmpQueue: cumulus_pallet_dmp_queue = 33,
 
+		// TELLOR: add sudo to runtime
 		Sudo: pallet_sudo,
 
-		// Tellor
+		// TELLOR: add tellor pallets to runtime
 		Tellor: tellor = 40,
 		UsingTellor: using_tellor = 41,
 	}
@@ -583,6 +586,7 @@ mod benches {
 	);
 }
 
+// TELLOR: define type aliases used by runtime-api
 type StakeInfo = tellor::StakeInfo<Balance>;
 type Value = BoundedVec<u8, <Runtime as tellor::Config>::MaxValueLength>;
 
@@ -722,7 +726,7 @@ impl_runtime_apis! {
 		}
 	}
 
-	// Tellor AutoPay API
+	// TELLOR: add AutoPay runtime api
 	impl tellor_runtime_api::TellorAutoPay<Block, AccountId, Balance> for Runtime {
 		fn get_current_feeds(query_id: QueryId) -> Vec<FeedId>{
 			Tellor::get_current_feeds(query_id)
@@ -794,7 +798,7 @@ impl_runtime_apis! {
 		}
 	}
 
-	// Tellor Oracle Api
+	// TELLOR: add Oracle runtime api
 	impl tellor_runtime_api::TellorOracle<Block, AccountId, BlockNumber, StakeInfo, Value> for Runtime {
 		fn get_block_number_by_timestamp(query_id: QueryId, timestamp: tellor::Timestamp) -> Option<BlockNumber> {
 			Tellor::get_block_number_by_timestamp(query_id, timestamp)
@@ -877,7 +881,7 @@ impl_runtime_apis! {
 		}
 	}
 
-	// Tellor Governance Api
+	// TELLOR: add Governance runtime api
 	impl tellor_runtime_api::TellorGovernance<Block, AccountId, Balance, BlockNumber, Value> for Runtime {
 		fn did_vote(dispute_id: DisputeId, vote_round: u8, voter: AccountId) -> bool{
 			Tellor::did_vote(dispute_id, vote_round, voter)

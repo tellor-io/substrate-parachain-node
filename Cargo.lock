@@ -11433,7 +11433,7 @@ checksum = "8ae9980cab1db3fceee2f6c6f643d5d8de2997c58ee8d25fb0cc8a9e9e7348e5"
 [[package]]
 name = "tellor"
 version = "0.1.0"
-source = "git+https://github.com/tellor-io/tellor-pallet?branch=frank/update_deps#aef2f43ef7ca98c81e5e0469df5d6630eda0e64c"
+source = "git+https://github.com/tellor-io/tellor-pallet#917dbd32ecacdaa1a5a7d7e4d9f35132caac0d8e"
 dependencies = [
  "ethabi",
  "frame-benchmarking",
@@ -11451,7 +11451,7 @@ dependencies = [
 [[package]]
 name = "tellor-runtime-api"
 version = "0.1.0"
-source = "git+https://github.com/tellor-io/tellor-pallet?branch=frank/update_deps#aef2f43ef7ca98c81e5e0469df5d6630eda0e64c"
+source = "git+https://github.com/tellor-io/tellor-pallet#917dbd32ecacdaa1a5a7d7e4d9f35132caac0d8e"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
@@ -12152,7 +12152,7 @@ dependencies = [
 [[package]]
 name = "using-tellor"
 version = "0.1.0"
-source = "git+https://github.com/tellor-io/using-tellor-pallet?branch=frank/update_deps#a368e70137b9fd040b7f887c215e7f2df5a8effe"
+source = "git+https://github.com/tellor-io/using-tellor-pallet#b24014a5b549fa8c9d63ff91f6be1ad300d1c809"
 dependencies = [
  "frame-benchmarking",
  "frame-support",

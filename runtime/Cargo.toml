@@ -71,9 +71,9 @@ pallet-collator-selection = { git = "https://github.com/paritytech/cumulus.git",
 parachain-info = { git = "https://github.com/paritytech/cumulus.git", branch = "polkadot-v0.9.40", default-features = false }
 
 # Tellor
-tellor = { git = "https://github.com/tellor-io/tellor-pallet", branch="frank/update_deps", default-features = false }
-tellor-runtime-api = { git = "https://github.com/tellor-io/tellor-pallet", branch="frank/update_deps", default-features = false }
-using-tellor = { git = "https://github.com/tellor-io/using-tellor-pallet", branch="frank/update_deps", default-features = false }
+tellor = { git = "https://github.com/tellor-io/tellor-pallet", default-features = false }
+tellor-runtime-api = { git = "https://github.com/tellor-io/tellor-pallet", default-features = false }
+using-tellor = { git = "https://github.com/tellor-io/using-tellor-pallet", default-features = false }
 
 [features]
 default = [

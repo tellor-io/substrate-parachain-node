@@ -59,7 +59,7 @@ use weights::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight};
 use xcm::latest::prelude::BodyId;
 use xcm_executor::XcmExecutor;
 
-/// Import the tellor pallet.
+/// TELLOR: Import the tellor types
 use tellor::{
 	DisputeId, EnsureGovernance, EnsureStaking, Feed, FeedId, QueryId, Tip, Tributes, VoteResult,
 };
@@ -81,7 +81,7 @@ pub type Balance = u128;
 pub type Index = u32;
 
 /// A hash of some data used by the chain.
-pub type Hash = H256;
+pub type Hash = sp_core::H256;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -128,9 +128,6 @@ pub type Executive = frame_executive::Executive<
 	Runtime,
 	AllPalletsWithSystem,
 >;
-
-/// A timestamp: milliseconds since the unix epoch.
-type Moment = u64;
 
 /// Handles converting a weight scalar to a fee value, based on the scale and granularity of the
 /// node's balance type.
@@ -184,6 +181,7 @@ impl_opaque_keys! {
 
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
+	// TELLOR: set runtime name
 	spec_name: create_runtime_str!("oracle-consumer"),
 	impl_name: create_runtime_str!("oracle-consumer"),
 	authoring_version: 1,
@@ -230,7 +228,7 @@ const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 /// We allow for 0.5 of a second of compute with a 12 second average block time.
 const MAXIMUM_BLOCK_WEIGHT: Weight = Weight::from_parts(
 	WEIGHT_REF_TIME_PER_SECOND.saturating_div(2),
-	cumulus_primitives_core::relay_chain::v2::MAX_POV_SIZE as u64,
+	cumulus_primitives_core::relay_chain::MAX_POV_SIZE as u64,
 );
 
 /// The version information used to identify this runtime when compiled natively.
@@ -318,11 +316,12 @@ impl frame_system::Config for Runtime {
 	type SS58Prefix = SS58Prefix;
 	/// The action to take on a Runtime Upgrade
 	type OnSetCode = cumulus_pallet_parachain_system::ParachainSetCode<Self>;
-	type MaxConsumers = ConstU32<16>;
+	type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
 impl pallet_timestamp::Config for Runtime {
-	type Moment = Moment;
+	/// A timestamp: milliseconds since the unix epoch.
+	type Moment = u64;
 	type OnTimestampSet = Aura;
 	type MinimumPeriod = ConstU64<{ SLOT_DURATION / 2 }>;
 	type WeightInfo = ();
@@ -330,8 +329,6 @@ impl pallet_timestamp::Config for Runtime {
 
 impl pallet_authorship::Config for Runtime {
 	type FindAuthor = pallet_session::FindAccountFromAuthorIndex<Self, Aura>;
-	type UncleGenerations = ConstU32<0>;
-	type FilterUncle = ();
 	type EventHandler = (CollatorSelection,);
 }
 
@@ -397,6 +394,7 @@ impl cumulus_pallet_xcmp_queue::Config for Runtime {
 	type ControllerOrigin = EnsureRoot<AccountId>;
 	type ControllerOriginConverter = XcmOriginToTransactDispatchOrigin;
 	type WeightInfo = ();
+	type PriceForSiblingDelivery = ();
 }
 
 impl cumulus_pallet_dmp_queue::Config for Runtime {
@@ -408,7 +406,6 @@ impl cumulus_pallet_dmp_queue::Config for Runtime {
 parameter_types! {
 	pub const Period: u32 = 6 * HOURS;
 	pub const Offset: u32 = 0;
-	pub const MaxAuthorities: u32 = 100_000;
 }
 
 impl pallet_session::Config for Runtime {
@@ -459,11 +456,13 @@ impl pallet_collator_selection::Config for Runtime {
 	type WeightInfo = ();
 }
 
+// TELLOR: add sudo config
 impl pallet_sudo::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
 }
 
+// TELLOR: add tellor pallet config
 parameter_types! {
 	pub const MinimumStakeAmount: u128 = 100 * 10u128.pow(18); // 100 TRB
 	// https://github.com/tellor-io/dataSpecs/blob/main/types/SpotPrice.md#trbusd-spot-price
@@ -473,10 +472,7 @@ parameter_types! {
 	pub XcmFeesAsset : AssetId = AssetId::Concrete(PalletInstance(3).into()); // 'Self-Reserve' on EVM parachain (aka Balances pallet)
 	pub FeeLocation : Junctions = Junctions::Here; // Native currency on this parachain
 }
-
 const DECIMALS: u8 = 12;
-
-/// Configure the tellor pallet
 impl tellor::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeOrigin = RuntimeOrigin;
@@ -489,11 +485,11 @@ impl tellor::Config for Runtime {
 	type GovernanceOrigin = EnsureGovernance;
 	type InitialDisputeFee = ConstU128<{ (100 / 10) * (5 * 10u128.pow(DECIMALS as u32)) }>; // (100 TRB / 10) * 5, where TRB 1:5 OCP
 	type MaxClaimTimestamps = ConstU32<10>;
-	type MaxDisputeVotes = ConstU32<10>;
 	type MaxFundedFeeds = ConstU32<10>;
 	type MaxQueryDataLength = ConstU32<512>;
 	type MaxTipsPerQuery = ConstU32<10>;
 	type MaxValueLength = ConstU32<256>;
+	type MaxVotes = ConstU32<10>;
 	type MinimumStakeAmount = MinimumStakeAmount;
 	type PalletId = TellorPalletId;
 	type ParachainId = ParachainId;
@@ -507,22 +503,24 @@ impl tellor::Config for Runtime {
 	type Time = Timestamp;
 	type UpdateStakeAmountInterval = ConstU64<{ 12 * tellor::HOURS }>;
 	type WeightToFee = ConstU128<10_000>;
-	type Xcm = TellorConfig;
+	type Xcm = SendXcm;
 	type XcmFeesAsset = XcmFeesAsset;
 	type XcmWeightToAsset = ConstU128<50_000>; // Moonbase Alpha: https://github.com/PureStake/moonbeam/blob/f19ba9de013a1c789425d3b71e8a92d54f2191af/runtime/moonbase/src/lib.rs#L135
 }
 
-pub struct TellorConfig;
-impl tellor::SendXcm for TellorConfig {
+// TELLOR: implement simple helper to wrap pallet_xcm::send_xcm
+pub struct SendXcm;
+impl tellor::SendXcm for SendXcm {
 	fn send_xcm(
 		interior: impl Into<Junctions>,
 		dest: impl Into<MultiLocation>,
 		message: Xcm<()>,
-	) -> Result<(), SendError> {
+	) -> Result<XcmHash, SendError> {
 		PolkadotXcm::send_xcm(interior, dest, message)
 	}
 }
 
+// TELLOR: implement simple helper to get local parachain id
 pub struct ParachainId;
 impl Get<u32> for ParachainId {
 	fn get() -> u32 {
@@ -530,7 +528,7 @@ impl Get<u32> for ParachainId {
 	}
 }
 
-/// Configure the using-tellor sample pallet
+/// TELLOR: add sample using-tellor pallet
 impl using_tellor::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type ConfigureOrigin = EnsureRoot<AccountId>;
@@ -545,45 +543,40 @@ construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
 		// System support stuff.
-		System: frame_system::{Pallet, Call, Config, Storage, Event<T>} = 0,
-		ParachainSystem: cumulus_pallet_parachain_system::{
-			Pallet, Call, Config, Storage, Inherent, Event<T>, ValidateUnsigned,
-		} = 1,
-		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent} = 2,
-		ParachainInfo: parachain_info::{Pallet, Storage, Config} = 3,
+		System: frame_system = 0,
+		ParachainSystem: cumulus_pallet_parachain_system = 1,
+		Timestamp: pallet_timestamp = 2,
+		ParachainInfo: parachain_info = 3,
 
 		// Monetary stuff.
-		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>} = 10,
-		TransactionPayment: pallet_transaction_payment::{Pallet, Storage, Event<T>} = 11,
+		Balances: pallet_balances = 10,
+		TransactionPayment: pallet_transaction_payment = 11,
 
 		// Collator support. The order of these 4 are important and shall not change.
-		Authorship: pallet_authorship::{Pallet, Call, Storage} = 20,
-		CollatorSelection: pallet_collator_selection::{Pallet, Call, Storage, Event<T>, Config<T>} = 21,
-		Session: pallet_session::{Pallet, Call, Storage, Event, Config<T>} = 22,
-		Aura: pallet_aura::{Pallet, Storage, Config<T>} = 23,
-		AuraExt: cumulus_pallet_aura_ext::{Pallet, Storage, Config} = 24,
+		Authorship: pallet_authorship = 20,
+		CollatorSelection: pallet_collator_selection = 21,
+		Session: pallet_session = 22,
+		Aura: pallet_aura = 23,
+		AuraExt: cumulus_pallet_aura_ext = 24,
 
 		// XCM helpers.
-		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>} = 30,
-		PolkadotXcm: pallet_xcm::{Pallet, Call, Event<T>, Origin, Config} = 31,
-		CumulusXcm: cumulus_pallet_xcm::{Pallet, Event<T>, Origin} = 32,
-		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>} = 33,
+		XcmpQueue: cumulus_pallet_xcmp_queue = 30,
+		PolkadotXcm: pallet_xcm = 31,
+		CumulusXcm: cumulus_pallet_xcm = 32,
+		DmpQueue: cumulus_pallet_dmp_queue = 33,
 
+		// TELLOR: add sudo to runtime
 		Sudo: pallet_sudo,
 
-		// Tellor
-		Tellor: tellor::{Pallet, Call, Storage, Event<T>, Origin}  = 40,
-		UsingTellor: using_tellor::{Pallet, Call, Storage, Event<T>}  = 41,
+		// TELLOR: add tellor pallets to runtime
+		Tellor: tellor = 40,
+		UsingTellor: using_tellor = 41,
 	}
 );
 
 #[cfg(feature = "runtime-benchmarks")]
-#[macro_use]
-extern crate frame_benchmarking;
-
-#[cfg(feature = "runtime-benchmarks")]
 mod benches {
-	define_benchmarks!(
+	frame_benchmarking::define_benchmarks!(
 		[frame_system, SystemBench::<Runtime>]
 		[pallet_balances, Balances]
 		[pallet_session, SessionBench::<Runtime>]
@@ -593,6 +586,7 @@ mod benches {
 	);
 }
 
+// TELLOR: define type aliases used by runtime-api
 type StakeInfo = tellor::StakeInfo<Balance>;
 type Value = BoundedVec<u8, <Runtime as tellor::Config>::MaxValueLength>;
 
@@ -695,6 +689,12 @@ impl_runtime_apis! {
 		) -> pallet_transaction_payment::FeeDetails<Balance> {
 			TransactionPayment::query_fee_details(uxt, len)
 		}
+		fn query_weight_to_fee(weight: Weight) -> Balance {
+			TransactionPayment::weight_to_fee(weight)
+		}
+		fn query_length_to_fee(length: u32) -> Balance {
+			TransactionPayment::length_to_fee(length)
+		}
 	}
 
 	impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentCallApi<Block, Balance, RuntimeCall>
@@ -712,6 +712,12 @@ impl_runtime_apis! {
 		) -> pallet_transaction_payment::FeeDetails<Balance> {
 			TransactionPayment::query_call_fee_details(call, len)
 		}
+		fn query_weight_to_fee(weight: Weight) -> Balance {
+			TransactionPayment::weight_to_fee(weight)
+		}
+		fn query_length_to_fee(length: u32) -> Balance {
+			TransactionPayment::length_to_fee(length)
+		}
 	}
 
 	impl cumulus_primitives_core::CollectCollationInfo<Block> for Runtime {
@@ -720,7 +726,7 @@ impl_runtime_apis! {
 		}
 	}
 
-	// Tellor AutoPay API
+	// TELLOR: add AutoPay runtime api
 	impl tellor_runtime_api::TellorAutoPay<Block, AccountId, Balance> for Runtime {
 		fn get_current_feeds(query_id: QueryId) -> Vec<FeedId>{
 			Tellor::get_current_feeds(query_id)
@@ -792,7 +798,7 @@ impl_runtime_apis! {
 		}
 	}
 
-	// Tellor Oracle Api
+	// TELLOR: add Oracle runtime api
 	impl tellor_runtime_api::TellorOracle<Block, AccountId, BlockNumber, StakeInfo, Value> for Runtime {
 		fn get_block_number_by_timestamp(query_id: QueryId, timestamp: tellor::Timestamp) -> Option<BlockNumber> {
 			Tellor::get_block_number_by_timestamp(query_id, timestamp)
@@ -875,7 +881,7 @@ impl_runtime_apis! {
 		}
 	}
 
-	// Tellor Governance Api
+	// TELLOR: add Governance runtime api
 	impl tellor_runtime_api::TellorGovernance<Block, AccountId, Balance, BlockNumber, Value> for Runtime {
 		fn did_vote(dispute_id: DisputeId, vote_round: u8, voter: AccountId) -> bool{
 			Tellor::did_vote(dispute_id, vote_round, voter)
@@ -932,21 +938,20 @@ impl_runtime_apis! {
 
 	#[cfg(feature = "try-runtime")]
 	impl frame_try_runtime::TryRuntime<Block> for Runtime {
-		fn on_runtime_upgrade() -> (Weight, Weight) {
-			log::info!("try-runtime::on_runtime_upgrade parachain-template.");
-			let weight = Executive::try_runtime_upgrade().unwrap();
+		fn on_runtime_upgrade(checks: frame_try_runtime::UpgradeCheckSelect) -> (Weight, Weight) {
+			let weight = Executive::try_runtime_upgrade(checks).unwrap();
 			(weight, RuntimeBlockWeights::get().max_block)
 		}
 
-		fn execute_block(block: Block, state_root_check: bool, select: frame_try_runtime::TryStateSelect) -> Weight {
-			log::info!(
-				target: "runtime::parachain-template", "try-runtime: executing block #{} ({:?}) / root checks: {:?} / sanity-checks: {:?}",
-				block.header.number,
-				block.header.hash(),
-				state_root_check,
-				select,
-			);
-			Executive::try_execute_block(block, state_root_check, select).expect("try_execute_block failed")
+		fn execute_block(
+			block: Block,
+			state_root_check: bool,
+			signature_check: bool,
+			select: frame_try_runtime::TryStateSelect,
+		) -> Weight {
+			// NOTE: intentional unwrap: we don't want to propagate the error backwards, and want to
+			// have a backtrace here.
+			Executive::try_execute_block(block, state_root_check, signature_check, select).unwrap()
 		}
 	}
 
@@ -979,18 +984,8 @@ impl_runtime_apis! {
 			use cumulus_pallet_session_benchmarking::Pallet as SessionBench;
 			impl cumulus_pallet_session_benchmarking::Config for Runtime {}
 
-			let whitelist: Vec<TrackedStorageKey> = vec![
-				// Block Number
-				hex_literal::hex!("26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac").to_vec().into(),
-				// Total Issuance
-				hex_literal::hex!("c2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80").to_vec().into(),
-				// Execution Phase
-				hex_literal::hex!("26aa394eea5630e07c48ae0c9558cef7ff553b5a9862a516939d82b3d3d8661a").to_vec().into(),
-				// Event Count
-				hex_literal::hex!("26aa394eea5630e07c48ae0c9558cef70a98fdbe9ce6c55837576c60c7af3850").to_vec().into(),
-				// System Events
-				hex_literal::hex!("26aa394eea5630e07c48ae0c9558cef780d41e5e16056765bc8461851072c9d7").to_vec().into(),
-			];
+			use frame_support::traits::WhitelistedStorageKeys;
+			let whitelist = AllPalletsWithSystem::whitelisted_storage_keys();
 
 			let mut batches = Vec::<BenchmarkBatch>::new();
 			let params = (&config, &whitelist);

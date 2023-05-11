@@ -100,7 +100,7 @@ pub type XcmOriginToTransactDispatchOrigin = (
 parameter_types! {
 	// One XCM operation is 1_000_000_000 weight - almost certainly a conservative estimate.
 	// TELLOR: reduce proof_size unit cost to value which works within Moonbeams DEFAULT_PROOF_SIZE value constraint
-	pub UnitWeightCost: Weight = Weight::from_parts(1_000_000_000, 25 * 1024);
+	pub UnitWeightCost: Weight = Weight::from_parts(1_000_000_000, 16 * 1024);
 	pub const MaxInstructions: u32 = 100;
 	pub const MaxAssetsIntoHolding: u32 = 64;
 }

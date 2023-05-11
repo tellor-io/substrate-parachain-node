@@ -517,6 +517,9 @@ impl tellor::SendXcm for SendXcm {
 		dest: impl Into<MultiLocation>,
 		message: Xcm<()>,
 	) -> Result<XcmHash, SendError> {
+		#[cfg(feature = "runtime-benchmarks")]
+		let dest: MultiLocation = <Runtime as pallet_xcm::Config>::ReachableDest::get()
+			.ok_or(SendError::Transport("Unreachable"))?;
 		PolkadotXcm::send_xcm(interior, dest, message)
 	}
 }

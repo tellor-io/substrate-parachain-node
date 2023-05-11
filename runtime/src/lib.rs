@@ -506,6 +506,7 @@ impl tellor::Config for Runtime {
 	type Xcm = SendXcm;
 	type XcmFeesAsset = XcmFeesAsset;
 	type XcmWeightToAsset = ConstU128<50_000>; // Moonbase Alpha: https://github.com/PureStake/moonbeam/blob/f19ba9de013a1c789425d3b71e8a92d54f2191af/runtime/moonbase/src/lib.rs#L135
+	type WeightInfo = tellor::SubstrateWeight<Runtime>; // Replace this with weight based on your runtime
 }
 
 // TELLOR: implement simple helper to wrap pallet_xcm::send_xcm

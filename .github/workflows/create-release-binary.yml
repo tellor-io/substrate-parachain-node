@@ -4,7 +4,7 @@ on:
   workflow_dispatch
 
 jobs:
-  build:
+  build_and_release:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Code
@@ -33,22 +33,9 @@ jobs:
         default: true
 
     - name: Build Release Binary
+      env:
+        CARGO_TARGET_DIR: ${{ github.workspace }}/target
       run: cargo build --release
-
-    - name: Archive production artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: parachain-template-node
-        path: ./substrate-parachain-node/target/release/parachain-template-node
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - name: Download artifacts
-      uses: actions/download-artifact@v2
-      with:
-        name: parachain-template-node
 
     - name: Create Release
       id: create_release
@@ -62,12 +49,11 @@ jobs:
         prerelease: false
 
     - name: Upload Release Asset
-      id: upload-release-asset 
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }} 
-        asset_path: ./parachain-template-node/parachain-template-node
+        asset_path: ${{ github.workspace }}/target/release/parachain-template-node
         asset_name: parachain-template-node
         asset_content_type: application/octet-stream

@@ -11433,7 +11433,7 @@ checksum = "8ae9980cab1db3fceee2f6c6f643d5d8de2997c58ee8d25fb0cc8a9e9e7348e5"
 [[package]]
 name = "tellor"
 version = "0.1.0"
-source = "git+https://github.com/tellor-io/tellor-pallet#e9a0b31d120296cf36bd9dadf385cd346adb4e1f"
+source = "git+https://github.com/tellor-io/tellor-pallet#5e265a1c0959a8793798a035770520992f66400e"
 dependencies = [
  "ethabi",
  "frame-benchmarking",
@@ -11451,7 +11451,7 @@ dependencies = [
 [[package]]
 name = "tellor-runtime-api"
 version = "0.1.0"
-source = "git+https://github.com/tellor-io/tellor-pallet#e9a0b31d120296cf36bd9dadf385cd346adb4e1f"
+source = "git+https://github.com/tellor-io/tellor-pallet#5e265a1c0959a8793798a035770520992f66400e"
 dependencies = [
  "parity-scale-codec",
  "sp-api",

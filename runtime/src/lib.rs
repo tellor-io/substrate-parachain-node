@@ -485,9 +485,7 @@ impl tellor::Config for Runtime {
 	type GovernanceOrigin = EnsureGovernance;
 	type InitialDisputeFee = ConstU128<{ (100 / 10) * (5 * 10u128.pow(DECIMALS as u32)) }>; // (100 TRB / 10) * 5, where TRB 1:5 OCP
 	type MaxClaimTimestamps = ConstU32<100>; // 100 timestamps per claim
-	type MaxFundedFeeds = ConstU32<1024>; // 1024 feeds
 	type MaxQueryDataLength = ConstU32<1024>;
-	type MaxTipsPerQuery = ConstU32<100>; // 100 tips per query id
 	type MaxValueLength = ConstU32<256>;
 	type MaxVotes = ConstU32<10>; // 10 votes max when voting on multiple disputes
 	type MinimumStakeAmount = MinimumStakeAmount;
@@ -836,11 +834,11 @@ impl_runtime_apis! {
 			Tellor::get_reporting_lock()
 		}
 
-		fn get_reports_submitted_by_address(reporter: AccountId) -> u128 {
+		fn get_reports_submitted_by_address(reporter: AccountId) -> u32 {
 			Tellor::get_reports_submitted_by_address(&reporter)
 		}
 
-		fn get_reports_submitted_by_address_and_query_id(reporter: AccountId, query_id: QueryId) -> u128 {
+		fn get_reports_submitted_by_address_and_query_id(reporter: AccountId, query_id: QueryId) -> u32 {
 			Tellor::get_reports_submitted_by_address_and_query_id(reporter, query_id)
 		}
 
@@ -872,7 +870,7 @@ impl_runtime_apis! {
 			Tellor::get_total_stake_amount()
 		}
 
-		fn get_total_stakers() -> u128 {
+		fn get_total_stakers() -> u64 {
 			Tellor::get_total_stakers()
 		}
 
@@ -903,11 +901,11 @@ impl_runtime_apis! {
 			Tellor::get_dispute_info(dispute_id)
 		}
 
-		fn get_open_disputes_on_id(query_id: QueryId) -> u128 {
+		fn get_open_disputes_on_id(query_id: QueryId) -> u32 {
 			Tellor::get_open_disputes_on_id(query_id)
 		}
 
-		fn get_vote_count() -> u128 {
+		fn get_vote_count() -> u64 {
 			Tellor::get_vote_count()
 		}
 
@@ -935,7 +933,7 @@ impl_runtime_apis! {
 			Tellor::get_vote_rounds(dispute_id)
 		}
 
-		fn get_vote_tally_by_address(voter: AccountId) -> u128 {
+		fn get_vote_tally_by_address(voter: AccountId) -> u32 {
 			Tellor::get_vote_tally_by_address(&voter)
 		}
 	}

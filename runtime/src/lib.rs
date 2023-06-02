@@ -485,6 +485,7 @@ impl tellor::Config for Runtime {
 	type GovernanceOrigin = EnsureGovernance;
 	type InitialDisputeFee = ConstU128<{ (100 / 10) * (5 * 10u128.pow(DECIMALS as u32)) }>; // (100 TRB / 10) * 5, where TRB 1:5 OCP
 	type MaxClaimTimestamps = ConstU32<100>; // 100 timestamps per claim
+	type MaxDisputedTimeSeries = ConstU32<100>;
 	type MaxQueryDataLength = ConstU32<1024>;
 	type MaxValueLength = ConstU32<256>;
 	type MaxVotes = ConstU32<10>; // 10 votes max when voting on multiple disputes
@@ -500,16 +501,19 @@ impl tellor::Config for Runtime {
 	type StakingToLocalTokenPriceQueryId = StakingToLocalTokenPriceQueryId;
 	type Time = Timestamp;
 	type UpdateStakeAmountInterval = ConstU64<{ 12 * tellor::HOURS }>;
-	type WeightToFee = ConstU128<10_000>;
+	type WeightToFee = ConstU128<1>;
 	type Xcm = SendXcm;
 	type XcmFeesAsset = XcmFeesAsset;
 	type XcmWeightToAsset = ConstU128<50_000>; // Moonbase Alpha: https://github.com/PureStake/moonbeam/blob/f19ba9de013a1c789425d3b71e8a92d54f2191af/runtime/moonbase/src/lib.rs#L135
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = TestBenchmarkHelper;
 	type WeightInfo = tellor::SubstrateWeight<Runtime>; // Replace this with weight based on your runtime
 }
 
 // TELLOR: implement simple helper to wrap pallet_xcm::send_xcm
 pub struct SendXcm;
 impl tellor::SendXcm for SendXcm {
+	#[allow(unused_variables)]
 	fn send_xcm(
 		interior: impl Into<Junctions>,
 		dest: impl Into<MultiLocation>,
@@ -527,6 +531,63 @@ pub struct ParachainId;
 impl Get<u32> for ParachainId {
 	fn get() -> u32 {
 		ParachainInfo::get().into()
+	}
+}
+
+// TELLOR: add helper for benchmarking
+pub struct TestBenchmarkHelper;
+#[cfg(feature = "runtime-benchmarks")]
+impl<MaxQueryDataLength: sp_core::Get<u32>>
+	tellor::traits::BenchmarkHelper<AccountId, Balance, MaxQueryDataLength> for TestBenchmarkHelper
+{
+	fn set_time(time_in_secs: u64) {
+		use core::time::Duration;
+		use frame_support::traits::UnixTime;
+		System::set_block_number(System::block_number() + 1);
+		let timestamp = (<Timestamp as UnixTime>::now() + Duration::from_secs(1 + time_in_secs))
+			.as_millis() as u64;
+		pallet_timestamp::Now::<Runtime>::put(timestamp);
+	}
+
+	fn set_balance(account_id: AccountId, amount: u128) {
+		use frame_support::traits::Currency;
+		Balances::make_free_balance_be(&account_id, Balance::from_be(amount));
+	}
+
+	fn get_staking_token_price_query_data() -> BoundedVec<u8, MaxQueryDataLength> {
+		BoundedVec::truncate_from(vec![
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 83, 112, 111, 116, 80, 114, 105, 99, 101, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 3, 116, 114, 98, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 117, 115, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		])
+	}
+
+	fn get_staking_to_local_token_price_query_data() -> BoundedVec<u8, MaxQueryDataLength> {
+		BoundedVec::truncate_from(vec![
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 83, 112, 111, 116, 80, 114, 105, 99, 101, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 3, 116, 114, 98, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 111, 99, 112, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		])
 	}
 }
 
@@ -585,6 +646,8 @@ mod benches {
 		[pallet_timestamp, Timestamp]
 		[pallet_collator_selection, CollatorSelection]
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
+		// TELLOR: add pallet for benchmarking
+		[tellor, Tellor]
 	);
 }
 
@@ -978,7 +1041,7 @@ impl_runtime_apis! {
 		fn dispatch_benchmark(
 			config: frame_benchmarking::BenchmarkConfig
 		) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, sp_runtime::RuntimeString> {
-			use frame_benchmarking::{Benchmarking, BenchmarkBatch, TrackedStorageKey};
+			use frame_benchmarking::{Benchmarking, BenchmarkBatch};
 
 			use frame_system_benchmarking::Pallet as SystemBench;
 			impl frame_system_benchmarking::Config for Runtime {}

@@ -24,7 +24,7 @@ use xcm_builder::{
 use xcm_executor::{traits::ShouldExecute, XcmExecutor};
 
 // TELLOR: define EVM smart contract parachain identifier
-const MOONBASE: u32 = 2000;
+pub const MOONBASE: u32 = 2000;
 
 parameter_types! {
 	pub const RelayLocation: MultiLocation = MultiLocation::parent();

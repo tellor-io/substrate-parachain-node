@@ -45,7 +45,7 @@ use frame_system::{
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 pub use sp_runtime::{MultiAddress, Perbill, Permill};
 use xcm::latest::prelude::*;
-use xcm_config::{XcmConfig, XcmOriginToTransactDispatchOrigin, MOONBASE};
+use xcm_config::{XcmConfig, XcmOriginToTransactDispatchOrigin};
 
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
@@ -66,10 +66,6 @@ use tellor::{
 use tellor_runtime_api::{FeedDetailsWithQueryData, SingleTipWithQueryData, VoteInfo};
 
 use xcm::latest::{Junctions, MultiLocation, SendError, Xcm};
-
-use weights::moonbeam_xcm_benchmarks_generic::WeightInfo;
-use weights::moonbeam_xcm_benchmarks_generic::SubstrateWeight as generic_weight_info;
-use weights::moonbeam_xcm_benchmarks_fungible::WeightInfo as fungible_weight_info;
 
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
 pub type Signature = MultiSignature;
@@ -512,24 +508,40 @@ impl tellor::Config for Runtime {
 	#[cfg(feature = "runtime-benchmarks")]
 	type BenchmarkHelper = TestBenchmarkHelper;
 	type WeightInfo = tellor::SubstrateWeight<Runtime>; // Replace this with weight based on your runtime
-	type Weigher = XCMWeigher;
+	type Weigher = Weigher;
 }
 
-pub struct XCMWeigher;
-impl tellor::traits::UniversalWeigher for XCMWeigher {
+// TELLOR: implement Weigher helper used to provide actual weights(calculated based on moonbeam's xcm weights) for xcm message execution on destination parachain
+pub struct Weigher;
+impl tellor::traits::UniversalWeigher for Weigher {
 	fn weigh(dest: impl Into<MultiLocation>, message: Xcm<()>) -> Result<Weight, ()> {
+		use weights::{
+			moonbeam_xcm_benchmarks_fungible::WeightInfo as fungible_weight_info,
+			moonbeam_xcm_benchmarks_generic::{SubstrateWeight as generic_weight_info, WeightInfo},
+		};
+
 		let mut weight: Weight = Weight::zero();
-		return match dest.into() {
-			MultiLocation {
-				parents: _,
-				interior: X1(Parachain(MOONBASE)),
-			} => {
+		match dest.into() {
+			MultiLocation { parents: _, interior: X1(Parachain(xcm_config::MOONBASE)) } => {
+				// Calculating total weight of xcm message by reading weights of each xcm instruction from moonbeam-specific weight functions
 				for instruction in message.0.iter() {
 					match instruction {
-						DescendOrigin(_) => weight = weight.checked_add(&generic_weight_info::<Runtime>::descend_origin()).ok_or(())?,
-						WithdrawAsset(_) => weight = weight.checked_add(&fungible_weight_info::<Runtime>::withdraw_asset()).ok_or(())?,
-						BuyExecution { .. } => weight = weight.checked_add(&generic_weight_info::<Runtime>::buy_execution()).ok_or(())?,
-						Transact { .. } => weight = weight.checked_add(&generic_weight_info::<Runtime>::transact()).ok_or(())?,
+						DescendOrigin(_) =>
+							weight = weight
+								.checked_add(&generic_weight_info::<Runtime>::descend_origin())
+								.ok_or(())?,
+						WithdrawAsset(_) =>
+							weight = weight
+								.checked_add(&fungible_weight_info::<Runtime>::withdraw_asset())
+								.ok_or(())?,
+						BuyExecution { .. } =>
+							weight = weight
+								.checked_add(&generic_weight_info::<Runtime>::buy_execution())
+								.ok_or(())?,
+						Transact { .. } =>
+							weight = weight
+								.checked_add(&generic_weight_info::<Runtime>::transact())
+								.ok_or(())?,
 						_ => weight = weight.checked_add(&Weight::zero()).ok_or(())?,
 					};
 				}
@@ -539,24 +551,20 @@ impl tellor::traits::UniversalWeigher for XCMWeigher {
 				log::trace!(target: "xcm::UniversalWeigher", "Unsupported MultiLocation");
 				Err(())
 			},
-		};
+		}
 	}
 }
-
-impl tellor::traits::Weigher for XCMWeigher {
+impl tellor::traits::Weigher for Weigher {
 	fn transact(dest: impl Into<MultiLocation>, gas_limit: u64) -> Weight {
-		return match dest.into() {
-			MultiLocation {
-				parents: _,
-				interior: X1(Parachain(MOONBASE)),
-			} => {
-				// https://github.com/PureStake/moonbeam/blob/master/runtime/moonbase/src/lib.rs#L371-L375
+		match dest.into() {
+			MultiLocation { parents: _, interior: X1(Parachain(xcm_config::MOONBASE)) } => {
+				// Calculating weight from gas limit as per moonbeam's calculation
 				const GAS_PER_SECOND: u64 = 40_000_000;
 				const WEIGHT_PER_GAS: u64 = WEIGHT_REF_TIME_PER_SECOND / GAS_PER_SECOND;
 				Weight::from_parts(gas_limit.saturating_mul(WEIGHT_PER_GAS), 0)
 					.saturating_add(RocksDbWeight::get().reads(1_u64))
-			}
-			_ => Weight::zero()
+			},
+			_ => Weight::zero(),
 		}
 	}
 }

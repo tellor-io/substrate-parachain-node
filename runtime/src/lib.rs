@@ -559,10 +559,17 @@ impl tellor::traits::Weigher for Weigher {
 		match dest.into() {
 			MultiLocation { parents: _, interior: X1(Parachain(xcm_config::MOONBASE)) } => {
 				// Calculating weight from gas limit as per moonbeam's calculation
+				// https://github.com/PureStake/moonbeam/blob/a3e40a9ff4082e278297a4dee3f6a51bab3f6ed1/runtime/moonbase/src/lib.rs#L382
 				const GAS_PER_SECOND: u64 = 40_000_000;
+				// https://github.com/PureStake/moonbeam/blob/a3e40a9ff4082e278297a4dee3f6a51bab3f6ed1/runtime/moonbase/src/lib.rs#L386
 				const WEIGHT_PER_GAS: u64 = WEIGHT_REF_TIME_PER_SECOND / GAS_PER_SECOND;
-				Weight::from_parts(gas_limit.saturating_mul(WEIGHT_PER_GAS), 0)
-					.saturating_add(RocksDbWeight::get().reads(1_u64))
+				// https://github.com/PureStake/moonbeam/blob/a3e40a9ff4082e278297a4dee3f6a51bab3f6ed1/runtime/moonbase/src/lib.rs#L412
+				const GAS_LIMIT_POV_SIZE_RATIO: u64 = 4;
+				Weight::from_parts(
+					gas_limit.saturating_mul(WEIGHT_PER_GAS),
+					gas_limit.saturating_div(GAS_LIMIT_POV_SIZE_RATIO),
+				)
+				.saturating_add(RocksDbWeight::get().reads(1_u64))
 			},
 			_ => Weight::zero(),
 		}

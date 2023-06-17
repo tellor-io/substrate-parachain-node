@@ -469,7 +469,7 @@ parameter_types! {
 	pub StakingTokenPriceQueryId: H256 = H256([92,19,205,156,151,219,185,143,36,41,193,1,162,168,21,14,108,122,13,218,255,97,36,238,23,106,58,65,16,103,222,208]);
 	pub StakingToLocalTokenPriceQueryId: H256 = H256([252, 212, 53, 69, 139, 47, 79, 224, 14, 207, 98, 192, 81, 195, 123, 170, 138, 241, 23, 4, 53, 70, 22, 191, 191, 171, 11, 101, 130, 16, 61, 30]);
 	pub const TellorPalletId: PalletId = PalletId(*b"py/tellr");
-	pub XcmFeesAsset : AssetId = AssetId::Concrete(PalletInstance(3).into()); // 'Self-Reserve' on EVM parachain (aka Balances pallet)
+	pub XcmFeesAsset : AssetId = AssetId::Concrete(PalletInstance(10).into()); // 'Self-Reserve' on EVM parachain (aka Balances pallet): https://github.com/PureStake/moonbeam/blob/ebb50badabea6021e3f593b19eecd3d84805ce49/runtime/moonbeam/src/lib.rs#L1323
 	pub FeeLocation : Junctions = Junctions::Here; // Native currency on this parachain
 }
 const DECIMALS: u8 = 12;
@@ -479,6 +479,7 @@ impl tellor::Config for Runtime {
 	type Asset = Balances;
 	type Balance = Balance;
 	type Decimals = ConstU8<DECIMALS>;
+	type EthereumXcmPalletIndex = ConstU8<109>;
 	type Fee = ConstU16<10>; // 1%
 	type FeeLocation = FeeLocation;
 	type Governance = xcm_config::TellorGovernance;
@@ -504,7 +505,7 @@ impl tellor::Config for Runtime {
 	type WeightToFee = ConstU128<1>;
 	type Xcm = SendXcm;
 	type XcmFeesAsset = XcmFeesAsset;
-	type XcmWeightToAsset = ConstU128<50_000>; // Moonbase Alpha: https://github.com/PureStake/moonbeam/blob/f19ba9de013a1c789425d3b71e8a92d54f2191af/runtime/moonbase/src/lib.rs#L135
+	type XcmWeightToAsset = ConstU128<{ 50 * 1_000 * 100 }>; // Moonbeam: https://github.com/PureStake/moonbeam/blob/ebb50badabea6021e3f593b19eecd3d84805ce49/runtime/moonbeam/src/lib.rs#L132
 	#[cfg(feature = "runtime-benchmarks")]
 	type BenchmarkHelper = TestBenchmarkHelper;
 	type WeightInfo = tellor::SubstrateWeight<Runtime>; // Replace this with weight based on your runtime
@@ -559,12 +560,13 @@ impl tellor::traits::Weigher for Weigher {
 		match dest.into() {
 			MultiLocation { parents: _, interior: X1(Parachain(xcm_config::MOONBASE)) } => {
 				// Calculating weight from gas limit as per moonbeam's calculation
-				// https://github.com/PureStake/moonbeam/blob/a3e40a9ff4082e278297a4dee3f6a51bab3f6ed1/runtime/moonbase/src/lib.rs#L382
+				// https://github.com/PureStake/moonbeam/blob/a3e40a9ff4082e278297a4dee3f6a51bab3f6ed1/runtime/moonbeam/src/lib.rs#L368
 				const GAS_PER_SECOND: u64 = 40_000_000;
-				// https://github.com/PureStake/moonbeam/blob/a3e40a9ff4082e278297a4dee3f6a51bab3f6ed1/runtime/moonbase/src/lib.rs#L386
+				// https://github.com/PureStake/moonbeam/blob/a3e40a9ff4082e278297a4dee3f6a51bab3f6ed1/runtime/moonbeam/src/lib.rs#L372
 				const WEIGHT_PER_GAS: u64 = WEIGHT_REF_TIME_PER_SECOND / GAS_PER_SECOND;
-				// https://github.com/PureStake/moonbeam/blob/a3e40a9ff4082e278297a4dee3f6a51bab3f6ed1/runtime/moonbase/src/lib.rs#L412
+				// https://github.com/PureStake/moonbeam/blob/a3e40a9ff4082e278297a4dee3f6a51bab3f6ed1/runtime/moonbeam/src/lib.rs#L399
 				const GAS_LIMIT_POV_SIZE_RATIO: u64 = 4;
+				// https://github.com/PureStake/frontier/blob/d6d476525c8fefccfa4674ee71ce9c44a193230b/frame/evm/src/lib.rs#L762
 				Weight::from_parts(
 					gas_limit.saturating_mul(WEIGHT_PER_GAS),
 					gas_limit.saturating_div(GAS_LIMIT_POV_SIZE_RATIO),

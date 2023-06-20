@@ -24,6 +24,7 @@ pub mod rocksdb_weights;
 // Tellor: This module is used to provide actual weights related to fungible assets from Moonbeam and are used in calculating accurate weights for execution on destination parachain,
 // see here for moonbeam's weights: https://github.com/PureStake/moonbeam/blob/master/pallets/moonbeam-xcm-benchmarks/src/weights/moonbeam_xcm_benchmarks_fungible.rs,
 // Note: Modified file and used default weights for xcm instructions as current moonbeam implementation is dependent on pallet_erc20_xcm_bridge, which is not currently applicable
+#[allow(dead_code)]
 pub mod moonbeam_xcm_benchmarks_fungible;
 // Tellor: This module is used to provide actual weights for xcm instructions from Moonbeam and are used in calculating accurate weights for execution on destination parachain,
 // see here for moonbeam's weights: https://github.com/PureStake/moonbeam/blob/master/pallets/moonbeam-xcm-benchmarks/src/weights/moonbeam_xcm_benchmarks_generic.rs

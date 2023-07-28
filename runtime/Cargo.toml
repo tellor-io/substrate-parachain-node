@@ -167,3 +167,5 @@ try-runtime = [
 	"tellor/try-runtime",
 	"using-tellor/try-runtime",
 ]
+
+moonbeam = []

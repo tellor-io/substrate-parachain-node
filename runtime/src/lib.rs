@@ -496,7 +496,6 @@ impl tellor::Config for Runtime {
 	type RegisterOrigin = EnsureRoot<AccountId>;
 	type Registry = xcm_config::TellorRegistry;
 	type StakeAmountCurrencyTarget = ConstU128<{ 500 * 10u128.pow(18) }>;
-	type Staking = xcm_config::TellorStaking;
 	type StakingOrigin = EnsureStaking;
 	type StakingTokenPriceQueryId = StakingTokenPriceQueryId;
 	type StakingToLocalTokenPriceQueryId = StakingToLocalTokenPriceQueryId;

@@ -462,6 +462,19 @@ impl pallet_sudo::Config for Runtime {
 	type RuntimeCall = RuntimeCall;
 }
 
+// TELLOR: configure xcm fees asset on destination parachain based on target runtime
+#[cfg(not(feature = "moonbeam"))]
+parameter_types! {
+	// Moonbase Alpha
+	pub const EthereumXcmPalletIndex: u8 = 38;
+	pub XcmFeesAsset : AssetId = AssetId::Concrete(PalletInstance(3).into()); // 'Self-Reserve' on EVM parachain (aka Balances pallet)
+}
+#[cfg(feature = "moonbeam")]
+parameter_types! {
+	pub const EthereumXcmPalletIndex: u8 = 109;
+	pub XcmFeesAsset : AssetId = AssetId::Concrete(PalletInstance(10).into()); // 'Self-Reserve' on EVM parachain (aka Balances pallet): https://github.com/PureStake/moonbeam/blob/ebb50badabea6021e3f593b19eecd3d84805ce49/runtime/moonbeam/src/lib.rs#L1323
+}
+
 // TELLOR: add tellor pallet config
 parameter_types! {
 	pub const MinimumStakeAmount: u128 = 100 * 10u128.pow(18); // 100 TRB
@@ -469,7 +482,6 @@ parameter_types! {
 	pub StakingTokenPriceQueryId: H256 = H256([92,19,205,156,151,219,185,143,36,41,193,1,162,168,21,14,108,122,13,218,255,97,36,238,23,106,58,65,16,103,222,208]);
 	pub StakingToLocalTokenPriceQueryId: H256 = H256([252, 212, 53, 69, 139, 47, 79, 224, 14, 207, 98, 192, 81, 195, 123, 170, 138, 241, 23, 4, 53, 70, 22, 191, 191, 171, 11, 101, 130, 16, 61, 30]);
 	pub const TellorPalletId: PalletId = PalletId(*b"py/tellr");
-	pub XcmFeesAsset : AssetId = AssetId::Concrete(PalletInstance(10).into()); // 'Self-Reserve' on EVM parachain (aka Balances pallet): https://github.com/PureStake/moonbeam/blob/ebb50badabea6021e3f593b19eecd3d84805ce49/runtime/moonbeam/src/lib.rs#L1323
 	pub FeeLocation : Junctions = Junctions::Here; // Native currency on this parachain
 }
 const DECIMALS: u8 = 12;
@@ -479,7 +491,7 @@ impl tellor::Config for Runtime {
 	type Asset = Balances;
 	type Balance = Balance;
 	type Decimals = ConstU8<DECIMALS>;
-	type EthereumXcmPalletIndex = ConstU8<109>;
+	type EthereumXcmPalletIndex = EthereumXcmPalletIndex;
 	type Fee = ConstU16<10>; // 1%
 	type FeeLocation = FeeLocation;
 	type Governance = xcm_config::TellorGovernance;

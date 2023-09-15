@@ -31,7 +31,7 @@ use frame_support::{
 	construct_runtime,
 	dispatch::DispatchClass,
 	parameter_types,
-	traits::{ConstU32, ConstU64, ConstU8, Everything},
+	traits::{ConstU32, ConstU64, ConstU8, EitherOfDiverse, Everything},
 	weights::{
 		constants::WEIGHT_REF_TIME_PER_SECOND, ConstantMultiplier, Weight, WeightToFeeCoefficient,
 		WeightToFeeCoefficients, WeightToFeePolynomial,
@@ -42,10 +42,11 @@ use frame_system::{
 	limits::{BlockLength, BlockWeights},
 	EnsureRoot,
 };
+use pallet_xcm::{EnsureXcm, IsVoiceOfBody};
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 pub use sp_runtime::{MultiAddress, Perbill, Permill};
 use xcm::latest::prelude::*;
-use xcm_config::{XcmConfig, XcmOriginToTransactDispatchOrigin};
+use xcm_config::{RelayLocation, XcmConfig, XcmOriginToTransactDispatchOrigin};
 
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
@@ -348,6 +349,10 @@ impl pallet_balances::Config for Runtime {
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 	type MaxReserves = ConstU32<50>;
 	type ReserveIdentifier = [u8; 8];
+	type HoldIdentifier = ();
+	type FreezeIdentifier = ();
+	type MaxHolds = ConstU32<0>;
+	type MaxFreezes = ConstU32<0>;
 }
 
 parameter_types! {
@@ -435,10 +440,15 @@ parameter_types! {
 	pub const SessionLength: BlockNumber = 6 * HOURS;
 	pub const MaxInvulnerables: u32 = 100;
 	pub const ExecutiveBody: BodyId = BodyId::Executive;
+	// StakingAdmin pluralistic body.
+	pub const StakingAdminBodyId: BodyId = BodyId::Defense;
 }
 
-// We allow root only to execute privileged collator selection operations.
-pub type CollatorSelectionUpdateOrigin = EnsureRoot<AccountId>;
+/// We allow root and the StakingAdmin to execute privileged collator selection operations.
+pub type CollatorSelectionUpdateOrigin = EitherOfDiverse<
+	EnsureRoot<AccountId>,
+	EnsureXcm<IsVoiceOfBody<RelayLocation, StakingAdminBodyId>>,
+>;
 
 impl pallet_collator_selection::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
@@ -460,6 +470,7 @@ impl pallet_collator_selection::Config for Runtime {
 impl pallet_sudo::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
+	type WeightInfo = ();
 }
 
 // TELLOR: configure xcm fees asset on destination parachain based on target runtime
@@ -538,22 +549,26 @@ impl tellor::traits::UniversalWeigher for Weigher {
 				// Calculating total weight of xcm message by reading weights of each xcm instruction from moonbeam-specific weight functions
 				for instruction in message.0.iter() {
 					match instruction {
-						DescendOrigin(_) =>
+						DescendOrigin(_) => {
 							weight = weight
 								.checked_add(&generic_weight_info::<Runtime>::descend_origin())
-								.ok_or(())?,
-						WithdrawAsset(_) =>
+								.ok_or(())?
+						},
+						WithdrawAsset(_) => {
 							weight = weight
 								.checked_add(&fungible_weight_info::<Runtime>::withdraw_asset())
-								.ok_or(())?,
-						BuyExecution { .. } =>
+								.ok_or(())?
+						},
+						BuyExecution { .. } => {
 							weight = weight
 								.checked_add(&generic_weight_info::<Runtime>::buy_execution())
-								.ok_or(())?,
-						Transact { .. } =>
+								.ok_or(())?
+						},
+						Transact { .. } => {
 							weight = weight
 								.checked_add(&generic_weight_info::<Runtime>::transact())
-								.ok_or(())?,
+								.ok_or(())?
+						},
 						_ => weight = weight.checked_add(&Weight::zero()).ok_or(())?,
 					};
 				}
@@ -762,6 +777,14 @@ impl_runtime_apis! {
 	impl sp_api::Metadata<Block> for Runtime {
 		fn metadata() -> OpaqueMetadata {
 			OpaqueMetadata::new(Runtime::metadata().into())
+		}
+
+		fn metadata_at_version(version: u32) -> Option<OpaqueMetadata> {
+			Runtime::metadata_at_version(version)
+		}
+
+		fn metadata_versions() -> sp_std::vec::Vec<u32> {
+			Runtime::metadata_versions()
 		}
 	}
 

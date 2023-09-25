@@ -73,7 +73,7 @@ parachain-info = { git = "https://github.com/paritytech/cumulus.git", branch = "
 # TELLOR: add tellor components
 tellor = { git = "https://github.com/tellor-io/tellor-pallet", default-features = false }
 tellor-runtime-api = { git = "https://github.com/tellor-io/tellor-pallet", default-features = false }
-using-tellor = { git = "https://github.com/tellor-io/using-tellor-pallet", default-features = false }
+using-tellor = { git = "https://github.com/tellor-io/tellor-pallet", default-features = false }
 
 [features]
 default = [

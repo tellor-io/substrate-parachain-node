@@ -4,22 +4,23 @@ use super::{
 };
 use core::{marker::PhantomData, ops::ControlFlow};
 use frame_support::{
-	ensure, log, match_types, parameter_types,
-	traits::{ConstU32, Contains, Everything, Nothing},
+	log, match_types, parameter_types,
+	traits::{ConstU32, Everything, Nothing, ProcessMessageError},
 	weights::Weight,
 };
+use frame_system::EnsureRoot;
 use pallet_xcm::XcmPassthrough;
 use polkadot_parachain::primitives::Sibling;
 use polkadot_runtime_common::impls::ToAuthor;
 use sp_runtime::traits::AccountIdConversion;
 use tellor::ContractLocation;
-use xcm::{latest::prelude::*, CreateMatcher, MatchXcm};
+use xcm::latest::prelude::*;
 use xcm_builder::{
 	AccountId32Aliases, AllowExplicitUnpaidExecutionFrom, AllowTopLevelPaidExecutionFrom,
-	CurrencyAdapter, EnsureXcmOrigin, FixedWeightBounds, IsConcrete, NativeAsset, ParentIsPreset,
-	RelayChainAsNative, SiblingParachainAsNative, SiblingParachainConvertsVia,
-	SignedAccountId32AsNative, SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit,
-	UsingComponents, WithComputedOrigin,
+	CreateMatcher, CurrencyAdapter, EnsureXcmOrigin, FixedWeightBounds, IsConcrete, MatchXcm,
+	NativeAsset, ParentIsPreset, RelayChainAsNative, SiblingParachainAsNative,
+	SiblingParachainConvertsVia, SignedAccountId32AsNative, SignedToAccountId32,
+	SovereignSignedViaLocation, TakeWeightCredit, UsingComponents, WithComputedOrigin,
 };
 use xcm_executor::{traits::ShouldExecute, XcmExecutor};
 
@@ -84,7 +85,7 @@ pub type XcmOriginToTransactDispatchOrigin = (
 	// using `LocationToAccountId` and then turn that into the usual `Signed` origin. Useful for
 	// foreign chains who want to have a local sovereign account on this chain which they control.
 	SovereignSignedViaLocation<LocationToAccountId, RuntimeOrigin>,
-	// Native converter for Relay-chain (Parent) location; will converts to a `Relay` origin when
+	// Native converter for Relay-chain (Parent) location; will convert to a `Relay` origin when
 	// recognized.
 	RelayChainAsNative<RelayChainOrigin, RuntimeOrigin>,
 	// Native converter for sibling Parachains; will convert to a `SiblingPara` origin when
@@ -130,7 +131,7 @@ where
 		message: &mut [Instruction<RuntimeCall>],
 		max_weight: Weight,
 		weight_credit: &mut Weight,
-	) -> Result<(), ()> {
+	) -> Result<(), ProcessMessageError> {
 		Deny::should_execute(origin, message, max_weight, weight_credit)?;
 		Allow::should_execute(origin, message, max_weight, weight_credit)
 	}
@@ -144,21 +145,21 @@ impl ShouldExecute for DenyReserveTransferToRelayChain {
 		message: &mut [Instruction<RuntimeCall>],
 		_max_weight: Weight,
 		_weight_credit: &mut Weight,
-	) -> Result<(), ()> {
+	) -> Result<(), ProcessMessageError> {
 		message.matcher().match_next_inst_while(
 			|_| true,
 			|inst| match inst {
 				InitiateReserveWithdraw {
 					reserve: MultiLocation { parents: 1, interior: Here },
 					..
-				} |
-				DepositReserveAsset {
+				}
+				| DepositReserveAsset {
 					dest: MultiLocation { parents: 1, interior: Here }, ..
-				} |
-				TransferReserveAsset {
+				}
+				| TransferReserveAsset {
 					dest: MultiLocation { parents: 1, interior: Here }, ..
 				} => {
-					Err(()) // Deny
+					Err(ProcessMessageError::Unsupported) // Deny
 				},
 				// An unexpected reserve transfer has arrived from the Relay Chain. Generally,
 				// `IsReserve` should not allow this, but we just log it here.
@@ -193,9 +194,6 @@ pub type Barrier = DenyThenTry<
 		TakeWeightCredit,
 		WithComputedOrigin<
 			(
-				// TELLOR: allow DescendOrigin, only for moonbeam, required to enable calls from smart contracts
-				// Could be further improved to only accept specific contract addresses
-				AllowTopLevelPaidExecutionDescendOriginFirst<Moonbeam>,
 				AllowTopLevelPaidExecutionFrom<Everything>,
 				AllowExplicitUnpaidExecutionFrom<ParentOrParentsExecutivePlurality>,
 				// ^^^ Parent and its exec plurality get free execution
@@ -279,56 +277,12 @@ impl pallet_xcm::Config for Runtime {
 	type WeightInfo = pallet_xcm::TestWeightInfo;
 	#[cfg(feature = "runtime-benchmarks")]
 	type ReachableDest = ReachableDest;
+	type AdminOrigin = EnsureRoot<AccountId>;
+	type MaxRemoteLockConsumers = ConstU32<0>;
+	type RemoteLockConsumerIdentifier = ();
 }
 
 impl cumulus_pallet_xcm::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type XcmExecutor = XcmExecutor<XcmConfig>;
-}
-
-// TELLOR: add barrier implementation from Moonbeam: taken from moonbeam's xcm_primitives::barriers::AllowTopLevelPaidExecutionDescendOriginFirst
-/// Barrier allowing a top level paid message with DescendOrigin instruction first
-pub struct AllowTopLevelPaidExecutionDescendOriginFirst<T>(PhantomData<T>);
-impl<T: Contains<MultiLocation>> ShouldExecute for AllowTopLevelPaidExecutionDescendOriginFirst<T> {
-	fn should_execute<Call>(
-		origin: &MultiLocation,
-		message: &mut [Instruction<Call>],
-		max_weight: Weight,
-		_weight_credit: &mut Weight,
-	) -> Result<(), ()> {
-		log::trace!(
-			target: "xcm::barriers",
-			"AllowTopLevelPaidExecutionDescendOriginFirst origin:
-			{:?}, message: {:?}, max_weight: {:?}, weight_credit: {:?}",
-			origin, message, max_weight, _weight_credit,
-		);
-		ensure!(T::contains(origin), ());
-		let mut iter = message.iter_mut();
-		// Make sure the first instruction is DescendOrigin
-		iter.next()
-			.filter(|instruction| matches!(instruction, DescendOrigin(_)))
-			.ok_or(())?;
-
-		// Then WithdrawAsset
-		iter.next()
-			.filter(|instruction| matches!(instruction, WithdrawAsset(_)))
-			.ok_or(())?;
-
-		// Then BuyExecution
-		let i = iter.next().ok_or(())?;
-		match i {
-			BuyExecution { weight_limit: Limited(ref mut weight), .. }
-				if weight.all_gte(max_weight) =>
-			{
-				weight.set_ref_time(max_weight.ref_time());
-				weight.set_proof_size(max_weight.proof_size());
-				Ok(())
-			},
-			BuyExecution { ref mut weight_limit, .. } if weight_limit == &Unlimited => {
-				*weight_limit = Limited(max_weight);
-				Ok(())
-			},
-			_ => Err(()),
-		}
-	}
 }

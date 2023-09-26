@@ -38,8 +38,8 @@ jobs:
       # - name: Check and Lint Code
       #   run: cargo +nightly clippy -- -D warnings
 
-      - name: Check Code
-        run: cargo check
+      # - name: Check Code
+      #  run: cargo check
 
       - name: Test Code
         run: cargo test

@@ -1,6 +1,9 @@
 [profile.release]
 panic = "unwind"
 
+[profile.test]
+debug = 0
+
 [workspace]
 members = [
 	"node",
